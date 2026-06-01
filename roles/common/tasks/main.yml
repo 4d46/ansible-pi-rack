@@ -66,7 +66,7 @@
     key: "{{ admin_ssh_key }}"
     state: present
     exclusive: true
-  register: ssh_key_result
+  register: common_ssh_key_result
   no_log: true
 
 - name: Harden SSH — disable root login
@@ -76,8 +76,8 @@
     line: 'PermitRootLogin no'
     state: present
     validate: /usr/sbin/sshd -t -f %s
-  when: 
-    - ssh_key_result is succeeded
+  when:
+    - common_ssh_key_result is succeeded
     - ssh_enforce_hardening | bool
   notify: Restart sshd
 
@@ -88,8 +88,8 @@
     line: 'PasswordAuthentication no'
     state: present
     validate: /usr/sbin/sshd -t -f %s
-  when: 
-    - ssh_key_result is succeeded
+  when:
+    - common_ssh_key_result is succeeded
     - ssh_enforce_hardening | bool
   notify: Restart sshd
 
