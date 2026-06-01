@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Maintain GitHub Actions (checkout, setup-python, etc.)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Maintain Ansible Collections (ansible.posix, community.general)
+  - package-ecosystem: "ansible"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Maintain Python dependencies (ansible, ansible-lint)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"

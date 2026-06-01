@@ -1,0 +1,4 @@
+---
+exclude_paths:
+  - .github/
+  - group_vars/pis/vault.yml.tpl # It contains template tags that might confuse linter

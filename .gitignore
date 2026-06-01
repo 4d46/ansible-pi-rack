@@ -1,0 +1,7 @@
+inventory.yml
+group_vars/pis/vault.yml
+.ansible_cache/
+*.retry
+.DS_Store
+*.md
+!README.md

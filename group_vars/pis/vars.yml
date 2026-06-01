@@ -1,0 +1,24 @@
+---
+# Vault variables are proxied here so templates use clean names.
+# Secret values live only in vault.yml.tpl / 1Password — never here.
+admin_user: admin
+admin_password: "{{ vault_admin_password }}"
+admin_ssh_key: "{{ vault_admin_ssh_key }}"
+
+# Grafana PDC Agent
+grafana_pdc_token: "{{ vault_grafana_pdc_token }}"
+grafana_pdc_cluster: "{{ vault_grafana_pdc_cluster }}"
+grafana_pdc_hosted_grafana_id: "{{ vault_grafana_pdc_hosted_grafana_id }}"
+
+# Network
+rack_subnet: "{{ vault_rack_subnet }}"
+
+# Tailscale
+tailscale_authkey: "{{ vault_tailscale_authkey }}"
+tailscale_hostname: "{{ inventory_hostname }}"
+tailscale_routes: "{{ rack_subnet }}"
+tailscale_extra_args: "--advertise-exit-node"
+
+# Safety toggle: Only harden SSH once we know we can log in with a key.
+# This is disabled automatically during 'make deploy-bootstrap'.
+ssh_enforce_hardening: true

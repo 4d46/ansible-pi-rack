@@ -1,0 +1,86 @@
+---
+- name: Enable IP forwarding for Tailscale
+  ansible.posix.sysctl:
+    name: "{{ item }}"
+    value: '1'
+    sysctl_file: /etc/sysctl.d/99-tailscale.conf
+    state: present
+    reload: true
+  loop:
+    - net.ipv4.ip_forward
+    - net.ipv6.conf.all.forwarding
+
+- name: Create Tailscale service directory
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/services/tailscale"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0755'
+
+- name: Create Tailscale state directory
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/services/tailscale/state"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0700'
+
+- name: Deploy Tailscale .env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "/home/{{ admin_user }}/services/tailscale/.env"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0600'
+
+- name: Deploy Tailscale Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "/home/{{ admin_user }}/services/tailscale/docker-compose.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Enable NAT masquerading for Tailscale exit node/subnet router
+  ansible.builtin.iptables:
+    table: nat
+    chain: POSTROUTING
+    # IMPORTANT: Ensure this matches your Pi's actual outbound interface (eth0 or wlan0)
+    out_interface: eth0 
+    jump: MASQUERADE
+    state: present
+  become: true
+
+- name: Allow forwarding from tailscale0 interface
+  ansible.builtin.iptables:
+    chain: FORWARD
+    in_interface: tailscale0
+    jump: ACCEPT
+    state: present
+  become: true
+
+- name: Allow forwarding to tailscale0 interface
+  ansible.builtin.iptables:
+    chain: FORWARD
+    out_interface: tailscale0
+    jump: ACCEPT
+    state: present
+  become: true
+
+- name: Ensure iptables-persistent is installed to save rules
+  ansible.builtin.apt:
+    name: iptables-persistent
+    state: present
+    update_cache: yes
+  become: true
+
+- name: Save iptables rules so they survive a reboot
+  ansible.builtin.command: netfilter-persistent save
+  become: true
+  changed_when: false
+
+- name: Ensure Tailscale is running
+  community.docker.docker_compose_v2:
+    project_src: "/home/{{ admin_user }}/services/tailscale"
+    state: present

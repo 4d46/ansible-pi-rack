@@ -1,0 +1,100 @@
+---
+- name: Update apt cache and upgrade packages
+  ansible.builtin.apt:
+    update_cache: true
+    upgrade: dist
+    cache_valid_time: 3600
+
+- name: Install essential system utilities
+  ansible.builtin.apt:
+    name:
+      - lshw
+      - htop
+      - vim
+      - curl
+      - wget
+      - git
+      - tree
+    state: present
+
+- name: Check for cmdline.txt location
+  ansible.builtin.stat:
+    path: /boot/firmware/cmdline.txt
+  register: common_cmdline_firmware
+
+- name: Set cmdline path fact
+  ansible.builtin.set_fact:
+    common_cmdline_file: "{{ common_cmdline_firmware.stat.exists | ternary('/boot/firmware/cmdline.txt', '/boot/cmdline.txt') }}"
+
+- name: Enable cgroups for K3s
+  ansible.builtin.lineinfile:
+    path: "{{ common_cmdline_file }}"
+    backrefs: true
+    regexp: '^((?!.*cgroup_enable=cpuset).*)$'
+    line: '\1 cgroup_enable=cpuset cgroup_enable=memory cgroup_memory=1'
+    state: present
+  notify: Reboot system
+
+- name: Ensure admin group exists
+  ansible.builtin.group:
+    name: "{{ admin_user }}"
+    state: present
+
+- name: Ensure admin user exists with sudo privileges
+  ansible.builtin.user:
+    name: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    groups: sudo
+    append: true
+    shell: /bin/bash
+    password: "{{ admin_password | password_hash('sha512') }}"
+    update_password: on_create
+    state: present
+
+- name: Ensure admin passwordless sudo
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/{{ admin_user }}"
+    content: "{{ admin_user }} ALL=(ALL) NOPASSWD:ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s
+
+- name: Deploy admin SSH public key
+  ansible.posix.authorized_key:
+    user: "{{ admin_user }}"
+    key: "{{ admin_ssh_key }}"
+    state: present
+    exclusive: true
+  register: ssh_key_result
+  no_log: true
+
+- name: Harden SSH — disable root login
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin'
+    line: 'PermitRootLogin no'
+    state: present
+    validate: /usr/sbin/sshd -t -f %s
+  when: 
+    - ssh_key_result is succeeded
+    - ssh_enforce_hardening | bool
+  notify: Restart sshd
+
+- name: Harden SSH — disable password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication'
+    line: 'PasswordAuthentication no'
+    state: present
+    validate: /usr/sbin/sshd -t -f %s
+  when: 
+    - ssh_key_result is succeeded
+    - ssh_enforce_hardening | bool
+  notify: Restart sshd
+
+- name: Ensure systemd-timesyncd is active
+  ansible.builtin.systemd:
+    name: systemd-timesyncd
+    enabled: true
+    state: started

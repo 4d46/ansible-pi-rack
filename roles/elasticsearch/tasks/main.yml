@@ -1,0 +1,29 @@
+---
+- name: Create Elasticsearch service directory
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/services/elasticsearch"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0755'
+
+- name: Deploy Elasticsearch Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "/home/{{ admin_user }}/services/elasticsearch/docker-compose.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Deploy Elasticsearch .env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "/home/{{ admin_user }}/services/elasticsearch/.env"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0600'
+
+- name: Ensure Elasticsearch is running
+  community.docker.docker_compose_v2:
+    project_src: "/home/{{ admin_user }}/services/elasticsearch"
+    state: present

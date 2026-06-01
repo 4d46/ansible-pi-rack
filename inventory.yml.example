@@ -1,0 +1,21 @@
+---
+all:
+  children:
+    # Physical hardware group
+    pis:
+      hosts:
+        pi01:
+          ansible_host: 192.168.1.50
+          ansible_user: admin
+        pi02:
+          ansible_host: 192.168.1.51
+          ansible_user: admin
+
+    # Functional Alias Groups
+    elasticsearch_nodes:
+      hosts:
+        pi01:
+
+    tailscale_nodes:
+      hosts:
+        pi02:

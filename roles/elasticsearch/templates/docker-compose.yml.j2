@@ -1,0 +1,31 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: elasticsearch
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=pi-rack-cluster
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms{{ es_heap_size | default('512m') }} -Xmx{{ es_heap_size | default('512m') }}"
+      - xpack.security.enabled=false
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    deploy:
+      resources:
+        limits:
+          memory: {{ es_memory_limit | default('1g') }}
+    ports:
+      - 9200:9200
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+  grafana-pdc:
+    image: grafana/pdc-agent:latest
+    command: ["-token", "${GRAFANA_PDC_TOKEN}", "-cluster", "${GRAFANA_PDC_CLUSTER}", "-gcloud-hosted-grafana-id", "${GRAFANA_PDC_HOSTED_GRAFANA_ID}"]
+    restart: unless-stopped
+
+volumes:
+  es_data:
+    driver: local
