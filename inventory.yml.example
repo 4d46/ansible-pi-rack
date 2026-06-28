@@ -19,3 +19,8 @@ all:
     tailscale_nodes:
       hosts:
         pi02:
+
+    homeassistant_nodes:
+      hosts:
+        pi02:
+
