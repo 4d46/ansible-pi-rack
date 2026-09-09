@@ -28,6 +28,8 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
 | `es pdc hosted grafana id` | Hosted Grafana ID for PDC |
 | `tailscale authkey` | Tailscale authentication key |
 | `rack subnet` | Network subnet for Tailscale routing (e.g., 192.168.1.0/24) |
+| `gandi-livedns-token` | Gandi LiveDNS API token, for certbot DNS-01 challenges |
+| `hostname-fqdn` | Fully-qualified domain name for the Let's Encrypt TLS certificate |
 | `inventory` | (Text field) The contents of your `inventory.yml` |
 
 ### 2. Local Configuration
@@ -69,6 +71,8 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
 - `roles/docker`: Docker repository and package installation.
 - `roles/elasticsearch`: Elasticsearch and Grafana PDC Agent deployment.
 - `roles/tailscale`: Tailscale subnet router and exit node configuration.
+- `roles/tls`: Let's Encrypt certificate issuance via Gandi DNS-01, with automatic renewal.
+- `roles/homeassistant`: Home Assistant container deployment.
 - `.github/workflows/lint.yml`: CI linting via `ansible-lint`.
 
 ## License
