@@ -22,3 +22,10 @@ tailscale_extra_args: "--advertise-exit-node"
 # Safety toggle: Only harden SSH once we know we can log in with a key.
 # This is disabled automatically during 'make deploy-bootstrap'.
 ssh_enforce_hardening: true
+
+# TLS / certbot
+certbot_gandi_ini: /etc/letsencrypt/gandi.ini
+tls_hostname_fqdn: "{{ vault_tls_hostname_fqdn }}"
+certbot_cert_dir: "/etc/letsencrypt/live/{{ tls_hostname_fqdn }}"
+vault_gandi_token: "{{ vault_gandi_token }}"
+

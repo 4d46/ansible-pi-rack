@@ -6,6 +6,8 @@ services:
     volumes:
       - /home/{{ admin_user }}/services/homeassistant/config:/config
       - /etc/localtime:/etc/localtime:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+
     deploy:
       resources:
         limits:

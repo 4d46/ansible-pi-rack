@@ -23,10 +23,13 @@
     - role: tailscale
       when: inventory_hostname in groups['tailscale_nodes']
 
+    - role: tls
+      when: inventory_hostname in groups['tls_nodes']
+
     - role: homeassistant
       when: inventory_hostname in groups['homeassistant_nodes']
 
-
   post_tasks:
+
     - name: Flush all handlers
       ansible.builtin.meta: flush_handlers

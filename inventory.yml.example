@@ -24,3 +24,8 @@ all:
       hosts:
         pi02:
 
+    tls_nodes:
+      hosts:
+        pi02:
+
+
