@@ -7,6 +7,7 @@ services:
       - /home/{{ admin_user }}/services/homeassistant/config:/config
       - /etc/localtime:/etc/localtime:ro
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /run/dbus:/run/dbus:ro
 
     deploy:
       resources:
