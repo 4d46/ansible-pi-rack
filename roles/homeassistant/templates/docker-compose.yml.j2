@@ -1,6 +1,6 @@
 services:
   homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:stable
+    image: ghcr.io/home-assistant/home-assistant:{{ ha_image_tag }}
     container_name: homeassistant
     network_mode: host
     volumes:
