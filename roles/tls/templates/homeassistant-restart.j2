@@ -1,0 +1,13 @@
+#!/bin/bash
+# Managed by Ansible — renewal deploy hook for Home Assistant certificates
+# Runs automatically after each successful certbot renewal.
+
+set -e
+
+if command -v docker >/dev/null 2>&1; then
+  if docker ps --format '{% raw %}{{.Names}}{% endraw %}' | grep -q "^homeassistant$"; then
+    echo "Restarting homeassistant container to reload TLS certificate..."
+
+    docker restart homeassistant
+  fi
+fi

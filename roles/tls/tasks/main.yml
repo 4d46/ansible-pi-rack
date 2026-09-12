@@ -1,0 +1,99 @@
+---
+- name: Ensure prerequisite packages for certbot virtualenv are installed
+  ansible.builtin.apt:
+    name:
+      - python3-venv
+      - python3-pip
+    state: present
+    update_cache: true
+
+- name: Create certbot virtualenv with certbot-dns-gandi
+  ansible.builtin.pip:
+    name:
+      - certbot
+      - certbot-dns-gandi
+      - "pyOpenSSL<24.0.0"
+    virtualenv: /opt/certbot
+    virtualenv_command: python3 -m venv
+    state: present
+
+- name: Symlink certbot into PATH
+  ansible.builtin.file:
+    src: /opt/certbot/bin/certbot
+    dest: /usr/local/bin/certbot
+    state: link
+
+- name: Schedule certbot renewal
+  ansible.builtin.cron:
+    name: certbot-renew
+    minute: "0"
+    hour: "0,12"
+    job: "/usr/local/bin/certbot renew -q"
+    user: root
+
+- name: Create /etc/letsencrypt directory
+  ansible.builtin.file:
+    path: /etc/letsencrypt
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create root secrets directory
+  ansible.builtin.file:
+    path: /root/.secrets
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create certbot secrets directory
+  ansible.builtin.file:
+    path: "{{ certbot_secrets_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Write Gandi LiveDNS credentials file
+  ansible.builtin.copy:
+    content: "dns_gandi_token={{ vault_gandi_token }}\n"
+    dest: "{{ certbot_gandi_ini }}"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+
+- name: Check if certificate already exists
+  ansible.builtin.stat:
+    path: "{{ certbot_cert_dir }}/fullchain.pem"
+  register: tls_cert_stat
+
+- name: Issue Let's Encrypt certificate via Gandi DNS-01
+  ansible.builtin.command: >
+    certbot certonly
+    --authenticator dns-gandi
+    --dns-gandi-credentials {{ certbot_gandi_ini }}
+    --email {{ tls_acme_email }}
+    --no-eff-email
+    --agree-tos
+    --non-interactive
+    -d {{ tls_hostname_fqdn }}
+  when: not tls_cert_stat.stat.exists
+  changed_when: true
+  no_log: true
+  register: tls_certbot_result
+
+
+- name: Deploy certbot renewal hook for Home Assistant
+  ansible.builtin.template:
+    src: homeassistant-restart.j2
+    dest: /etc/letsencrypt/renewal-hooks/deploy/homeassistant-restart
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Run deploy hook on initial certificate issuance
+  ansible.builtin.command: /etc/letsencrypt/renewal-hooks/deploy/homeassistant-restart
+  when: not tls_cert_stat.stat.exists or (tls_certbot_result is defined and tls_certbot_result.changed)
+  changed_when: false

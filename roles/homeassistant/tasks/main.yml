@@ -1,0 +1,29 @@
+---
+- name: Create Home Assistant service directory
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/services/homeassistant"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0750'
+
+- name: Create Home Assistant config directory
+  ansible.builtin.file:
+    path: "/home/{{ admin_user }}/services/homeassistant/config"
+    state: directory
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0750'
+
+- name: Deploy Home Assistant Compose file
+  ansible.builtin.template:
+    src: docker-compose.yml.j2
+    dest: "/home/{{ admin_user }}/services/homeassistant/docker-compose.yml"
+    owner: "{{ admin_user }}"
+    group: "{{ admin_user }}"
+    mode: '0644'
+
+- name: Ensure Home Assistant is running
+  community.docker.docker_compose_v2:
+    project_src: "/home/{{ admin_user }}/services/homeassistant"
+    state: present

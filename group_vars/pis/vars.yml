@@ -22,3 +22,13 @@ tailscale_extra_args: "--advertise-exit-node"
 # Safety toggle: Only harden SSH once we know we can log in with a key.
 # This is disabled automatically during 'make deploy-bootstrap'.
 ssh_enforce_hardening: true
+
+# TLS / certbot
+certbot_secrets_dir: /root/.secrets/certbot
+certbot_gandi_ini: "{{ certbot_secrets_dir }}/gandi.ini"
+tls_hostname_fqdn: "{{ vault_tls_hostname_fqdn }}"
+tls_acme_email: "{{ vault_le_email }}"
+certbot_cert_dir: "/etc/letsencrypt/live/{{ tls_hostname_fqdn }}"
+
+# Home Assistant
+ha_image_tag: "2026.9.2"
