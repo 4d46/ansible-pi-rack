@@ -11,5 +11,6 @@ vault_tailscale_authkey: "{{ op://System Credentials/PiRack/tailscale authkey }}
 vault_rack_subnet: "{{ op://System Credentials/PiRack/rack subnet }}"
 vault_gandi_token: "{{ op://System Credentials/PiRack/gandi-livedns-token }}"
 vault_tls_hostname_fqdn: "{{ op://System Credentials/PiRack/hostname-fqdn }}"
+vault_le_email: "{{ op://System Credentials/PiRack/letsencrypt-email }}"
 
 

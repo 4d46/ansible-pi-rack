@@ -30,6 +30,7 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
 | `rack subnet` | Network subnet for Tailscale routing (e.g., 192.168.1.0/24) |
 | `gandi-livedns-token` | Gandi LiveDNS API token, for certbot DNS-01 challenges |
 | `hostname-fqdn` | Fully-qualified domain name for the Let's Encrypt TLS certificate |
+| `letsencrypt-email` | Contact email for Let's Encrypt certificate expiry/registration notices |
 | `inventory` | (Text field) The contents of your `inventory.yml` |
 
 ### 2. Local Configuration

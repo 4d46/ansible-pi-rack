@@ -39,6 +39,22 @@
     group: root
     mode: "0755"
 
+- name: Create root secrets directory
+  ansible.builtin.file:
+    path: /root/.secrets
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Create certbot secrets directory
+  ansible.builtin.file:
+    path: "{{ certbot_secrets_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
 - name: Write Gandi LiveDNS credentials file
   ansible.builtin.copy:
     content: "dns_gandi_token={{ vault_gandi_token }}\n"
@@ -58,7 +74,8 @@
     certbot certonly
     --authenticator dns-gandi
     --dns-gandi-credentials {{ certbot_gandi_ini }}
-    --register-unsafely-without-email
+    --email {{ tls_acme_email }}
+    --no-eff-email
     --agree-tos
     --non-interactive
     -d {{ tls_hostname_fqdn }}

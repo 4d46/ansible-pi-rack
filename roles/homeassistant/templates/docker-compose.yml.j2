@@ -6,7 +6,8 @@ services:
     volumes:
       - /home/{{ admin_user }}/services/homeassistant/config:/config
       - /etc/localtime:/etc/localtime:ro
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/letsencrypt/live:/etc/letsencrypt/live:ro
+      - /etc/letsencrypt/archive:/etc/letsencrypt/archive:ro
       - /run/dbus:/run/dbus:ro
 
     deploy:
