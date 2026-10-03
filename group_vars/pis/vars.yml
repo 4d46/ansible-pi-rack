@@ -23,6 +23,12 @@ tailscale_extra_args: "--advertise-exit-node"
 # This is disabled automatically during 'make deploy-bootstrap'.
 ssh_enforce_hardening: true
 
+# Onboard radios: the rack is wired, so keep the attack surface down. Flipping
+# either back to true and re-running the playbook restores it (with a reboot).
+# Override per host in inventory.yml if one Pi needs a radio (see README).
+bluetooth_enabled: false
+wifi_enabled: false
+
 # TLS / certbot
 certbot_secrets_dir: /root/.secrets/certbot
 certbot_gandi_ini: "{{ certbot_secrets_dir }}/gandi.ini"

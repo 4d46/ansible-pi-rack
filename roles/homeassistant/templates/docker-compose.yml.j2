@@ -8,7 +8,11 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /etc/letsencrypt/live:/etc/letsencrypt/live:ro
       - /etc/letsencrypt/archive:/etc/letsencrypt/archive:ro
+{% if bluetooth_enabled | bool %}
+      # Host system bus for BlueZ. Root in the container is root on this bus,
+      # so only mount it when Bluetooth is actually wanted.
       - /run/dbus:/run/dbus:ro
+{% endif %}
 
     deploy:
       resources:

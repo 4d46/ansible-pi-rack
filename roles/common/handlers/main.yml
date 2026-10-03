@@ -6,4 +6,4 @@
 
 - name: Reboot system
   ansible.builtin.reboot:
-    msg: "Rebooting for cgroup configuration"
+    msg: "Rebooting to apply boot configuration changes"
