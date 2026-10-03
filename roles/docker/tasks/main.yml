@@ -13,11 +13,67 @@
     state: directory
     mode: '0755'
 
-- name: Download Docker official GPG key
-  ansible.builtin.get_url:
-    url: https://download.docker.com/linux/debian/gpg
-    dest: /etc/apt/keyrings/docker.asc
-    mode: '0644'
+# The key is downloaded to a private temp file and its fingerprint checked
+# before it reaches /etc/apt/keyrings, so apt never trusts an unverified key.
+# The fetch/inspect steps only touch the temp file, so they also run in check
+# mode, letting --check report accurately whether the installed key would change.
+- name: Install verified Docker GPG key
+  block:
+    - name: Create temp file for Docker GPG key
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .asc
+      register: docker_gpg_tmp
+      check_mode: false
+      changed_when: false
+
+    - name: Download Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: "{{ docker_gpg_tmp.path }}"
+        mode: '0600'
+        force: true
+      check_mode: false
+      changed_when: false
+
+    - name: Read Docker GPG key fingerprint
+      ansible.builtin.command:
+        argv: [gpg, --show-keys, --with-colons, "{{ docker_gpg_tmp.path }}"]
+      register: docker_gpg_show
+      check_mode: false
+      changed_when: false
+
+    # In --with-colons output the first fpr record is the primary key's
+    # fingerprint, in field 10.
+    - name: Verify Docker GPG key fingerprint
+      ansible.builtin.assert:
+        that: docker_gpg_actual == docker_gpg_fingerprint | replace(' ', '') | upper
+        fail_msg: >-
+          Docker GPG key fingerprint {{ docker_gpg_actual }} does not match the
+          pinned {{ docker_gpg_fingerprint }}. Verify the new key independently (see
+          roles/docker/defaults/main.yml) before updating docker_gpg_fingerprint.
+        quiet: true
+      vars:
+        docker_gpg_actual: >-
+          {{ (docker_gpg_show.stdout_lines | select('match', '^fpr:') | first).split(':')[9] }}
+
+    - name: Install Docker GPG key
+      ansible.builtin.copy:
+        src: "{{ docker_gpg_tmp.path }}"
+        remote_src: true
+        dest: /etc/apt/keyrings/docker.asc
+        owner: root
+        group: root
+        mode: '0644'
+
+  always:
+    - name: Remove temp Docker GPG key
+      ansible.builtin.file:
+        path: "{{ docker_gpg_tmp.path }}"
+        state: absent
+      check_mode: false
+      changed_when: false
+      when: docker_gpg_tmp.path is defined
 
 - name: Add Docker repository to Apt sources
   ansible.builtin.apt_repository:
