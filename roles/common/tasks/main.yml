@@ -35,6 +35,56 @@
     state: present
   notify: Reboot system
 
+- name: Check for config.txt location
+  ansible.builtin.stat:
+    path: /boot/firmware/config.txt
+  register: common_config_firmware
+
+- name: Set config.txt path fact
+  ansible.builtin.set_fact:
+    common_config_file: "{{ common_config_firmware.stat.exists | ternary('/boot/firmware/config.txt', '/boot/config.txt') }}"
+
+# Disabling Wi-Fi on a host we reach over Wi-Fi would strand it until the SD card is edited by hand.
+- name: Refuse to disable Wi-Fi on a host whose default route uses it
+  ansible.builtin.assert:
+    that: not (ansible_default_ipv4.interface | default('') is match('wl'))
+    fail_msg: >-
+      {{ inventory_hostname }} routes via {{ ansible_default_ipv4.interface }};
+      set wifi_enabled=true for this host or move it to Ethernet first.
+    quiet: true
+  when: not wifi_enabled | bool
+
+# Device-tree overlays stop the firmware bringing the radios up at all, so the
+# kernel never creates hci0/wlan0. The explicit [all] header ensures the block
+# applies to every board regardless of which conditional section precedes it.
+- name: Disable unused onboard radios at boot
+  ansible.builtin.blockinfile:
+    path: "{{ common_config_file }}"
+    marker: "# {mark} ANSIBLE MANAGED BLOCK: onboard radios"
+    block: "{{ (['[all]'] + common_radio_overlays) | join('\n') }}"
+    state: "{{ (common_radio_overlays | length > 0) | ternary('present', 'absent') }}"
+    backup: true
+  vars:
+    common_radio_overlays: >-
+      {{ ([] if bluetooth_enabled | bool else ['dtoverlay=disable-bt'])
+         + ([] if wifi_enabled | bool else ['dtoverlay=disable-wifi']) }}
+  notify: Reboot system
+
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+# When re-enabling, the services only start cleanly after the reboot removes
+# the overlay, so leave their run state alone and just enable them for boot.
+- name: Set Bluetooth services state
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: "{{ bluetooth_enabled | bool }}"
+    state: "{{ omit if bluetooth_enabled | bool else 'stopped' }}"
+  loop:
+    - hciuart.service
+    - bluetooth.service
+  when: item in ansible_facts.services
+
 - name: Ensure admin group exists
   ansible.builtin.group:
     name: "{{ admin_user }}"

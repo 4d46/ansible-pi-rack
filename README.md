@@ -4,7 +4,7 @@ Ansible playbook to bootstrap and configure a Raspberry Pi homelab cluster. Desi
 
 ## Features
 - **Secure by Design**: Secrets and network details are never committed. They are injected at runtime via 1Password CLI (`op`).
-- **OS Hardening**: Disables password authentication, root login, and configures passwordless sudo for the `admin` user.
+- **OS Hardening**: Disables password authentication, root login, and configures passwordless sudo for the `admin` user. Onboard Bluetooth and Wi-Fi are disabled at boot (see [Onboard Radios](#onboard-radios-bluetooth--wi-fi)).
 - **K3s Ready**: Automatically enables `cpuset` and `memory` cgroups.
 - **Docker Engine**: Installs Docker CE with log rotation configured to prevent SD card wear.
 - **CI Integrated**: GitHub Actions workflow for automated linting.
@@ -65,6 +65,39 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
   ```bash
   make check
   ```
+
+### Onboard Radios (Bluetooth / Wi-Fi)
+The rack is wired, so onboard Bluetooth and Wi-Fi are disabled on every Pi by default (`group_vars/pis/vars.yml`):
+
+```yaml
+bluetooth_enabled: false
+wifi_enabled: false
+```
+
+When disabled, the `common` role adds `dtoverlay=disable-bt` / `dtoverlay=disable-wifi` to a managed block in `config.txt` (so the firmware never brings the radio up), stops and disables the `hciuart` and `bluetooth` services, and the Home Assistant container is deployed without the host D-Bus mount.
+
+To re-enable a radio on a single Pi, set the variable on that host in `inventory.yml`, then push the inventory and deploy:
+
+```yaml
+pis:
+  hosts:
+    pi02:
+      ansible_host: 192.168.1.51
+      ansible_user: admin
+      bluetooth_enabled: true
+```
+
+```bash
+make inventory-push
+make check    # expect the config.txt block, services and HA compose to change
+make deploy   # the Pi reboots to apply the config.txt change
+```
+
+To re-enable on every Pi instead, change the default in `group_vars/pis/vars.yml`.
+
+After re-enabling Bluetooth, re-add the Bluetooth integration in Home Assistant (Settings → Devices & services). It may then ask for extra permissions (`cap_add: [NET_ADMIN, NET_RAW]`) for full adapter control. Note that this grants the container control over the host's network configuration, because it uses host networking.
+
+> **Safety check:** the playbook refuses to disable Wi-Fi on a host whose default route is over a `wl*` interface, so a Wi-Fi-connected Pi can't be stranded. Set `wifi_enabled: true` for that host, or move it to Ethernet first.
 
 ## Repository Structure
 - `group_vars/pis/vault.yml.tpl`: Template for secret injection from 1Password.
