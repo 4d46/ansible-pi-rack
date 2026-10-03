@@ -47,9 +47,9 @@
 # Disabling Wi-Fi on a host we reach over Wi-Fi would strand it until the SD card is edited by hand.
 - name: Refuse to disable Wi-Fi on a host whose default route uses it
   ansible.builtin.assert:
-    that: not (ansible_default_ipv4.interface | default('') is match('wl'))
+    that: not (ansible_facts['default_ipv4']['interface'] | default('') is match('wl'))
     fail_msg: >-
-      {{ inventory_hostname }} routes via {{ ansible_default_ipv4.interface }};
+      {{ inventory_hostname }} routes via {{ ansible_facts['default_ipv4']['interface'] }};
       set wifi_enabled=true for this host or move it to Ethernet first.
     quiet: true
   when: not wifi_enabled | bool
