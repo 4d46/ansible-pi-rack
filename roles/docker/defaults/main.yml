@@ -1,5 +1,7 @@
 ---
-# Fingerprint of Docker's apt signing key, as published at
-# https://docs.docker.com/engine/install/debian/ — verify there before changing.
+# Primary fingerprint of Docker's apt signing key ("Docker Release (CE deb)").
+# Docker's install docs no longer print it; cross-check against
+# https://keyserver.ubuntu.com/pks/lookup?search=0x9DC858229FC7DD38854AE2D88D81803C0EBFCD88&op=index
+# and a key already trusted on a Pi before changing it.
 # A mismatch fails the play rather than trusting a key we didn't expect.
 docker_gpg_fingerprint: "9DC858229FC7DD38854AE2D88D81803C0EBFCD88"
