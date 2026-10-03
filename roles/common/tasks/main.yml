@@ -57,13 +57,14 @@
 # Device-tree overlays stop the firmware bringing the radios up at all, so the
 # kernel never creates hci0/wlan0. The explicit [all] header ensures the block
 # applies to every board regardless of which conditional section precedes it.
+# No backup: /boot/firmware is FAT, and the timestamped backup name contains
+# colons, which FAT rejects (EINVAL).
 - name: Disable unused onboard radios at boot
   ansible.builtin.blockinfile:
     path: "{{ common_config_file }}"
     marker: "# {mark} ANSIBLE MANAGED BLOCK: onboard radios"
     block: "{{ (['[all]'] + common_radio_overlays) | join('\n') }}"
     state: "{{ (common_radio_overlays | length > 0) | ternary('present', 'absent') }}"
-    backup: true
   vars:
     common_radio_overlays: >-
       {{ ([] if bluetooth_enabled | bool else ['dtoverlay=disable-bt'])
