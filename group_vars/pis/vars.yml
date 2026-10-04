@@ -50,7 +50,7 @@ ha_image_tag: "2026.9.2"
 es_image_tag: "8.13.4"
 
 # renovate: datasource=docker depName=grafana/pdc-agent
-grafana_pdc_image_tag: "0.0.59"
+grafana_pdc_image_tag: "0.0.66"
 
 # renovate: datasource=docker depName=tailscale/tailscale
 tailscale_image_tag: "v1.98.4"
