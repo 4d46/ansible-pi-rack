@@ -64,12 +64,14 @@ _inject:
 	@echo "Injecting secrets from 1Password..."
 	op inject -f -i $(VAULT_TPL) -o $(VAULT_YML)
 
-# Show the image each running container was started from, per Pi. Compare
-# against the *_image_tag pins in group_vars/pis/vars.yml to spot drift.
+# Show the image each running container was started from, per Pi, including
+# the first 12 hex digits of its pinned digest (docker ps hides the digest).
+# Compare against the *_image_tag pins in group_vars/pis/vars.yml to spot drift.
 # {% raw %} stops Ansible treating Docker's Go-template braces as Jinja.
 versions:
-	@ansible all -i $(INVENTORY) -b -m ansible.builtin.command \
-		-a "docker ps --format '{% raw %}{{.Names}}\t{{.Image}}\t{{.Status}}{% endraw %}'"
+	@ansible all -i $(INVENTORY) -b -m ansible.builtin.shell \
+		-a "docker ps -q | xargs -r docker inspect --format '{% raw %}{{.Name}}|{{.Config.Image}}|started {{.State.StartedAt}}{% endraw %}' \
+			| sed -E 's|^/||; s|[|]|\t|g; s|(@sha256:[0-9a-f]{12})[0-9a-f]+|\1|; s|T([0-9:]{5}):[0-9.]+Z$$| \1Z|'"
 
 deps:
 	ansible-galaxy collection install -r requirements.yml
