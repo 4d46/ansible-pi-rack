@@ -1,0 +1,9 @@
+{
+ "number": 21,
+ "title": "Bump actions/checkout from 4 to 5",
+ "author": {
+  "login": "app/dependabot"
+ },
+ "url": "https://github.com/4d46/ansible-pi-rack/pull/21",
+ "body": "Bumps [actions/checkout](https://github.com/actions/checkout) from 4 to 5.\n<details><summary>Release notes</summary>v5 uses node24</details>\n"
+}

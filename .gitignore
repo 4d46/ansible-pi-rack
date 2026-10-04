@@ -5,3 +5,5 @@ group_vars/pis/vault.yml
 .DS_Store
 *.md
 !README.md
+# The review tool's system prompt is code, not notes.
+!scripts/review/*.md

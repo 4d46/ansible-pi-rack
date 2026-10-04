@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# upgrades - see what dependency updates are waiting, without the GitHub web UI.
+# upgrades - see what dependency updates are waiting, and how risky they are,
+# without the GitHub web UI.
 #
 # Reads open pull requests from Renovate (container images) and Dependabot
 # (Actions, pip, collections) with the GitHub CLI. Read-only: it never
@@ -7,6 +8,11 @@
 set -euo pipefail
 
 readonly PROG="upgrades"
+REPO_ROOT=$(cd "$(dirname "$0")/.." && pwd)
+readonly REPO_ROOT
+readonly REVIEW_DIR="$REPO_ROOT/scripts/review"
+readonly REVIEW_MODEL=${UPGRADES_REVIEW_MODEL:-claude-opus-5-5}
+readonly REVIEW_EFFORT=${UPGRADES_REVIEW_EFFORT:-high}
 
 usage() {
     cat <<EOF
@@ -15,10 +21,22 @@ Usage: $PROG <command>
 Commands:
   list      List open Renovate and Dependabot PRs: number, package, version
             change, update type, CI checks, mergeability and age.
+  review <PR> [--dry-run] [--no-facts]
+            AI risk review of one upgrade PR: which breaking changes affect
+            this rack, what to do before and after deploying, and whether it
+            can be rolled back. Combines the PR's release notes with how the
+            software is deployed here (repo files) and live facts collected
+            read-only from the Pis (hostnames and IPs redacted). Advisory only:
+            it prints to the terminal and never acts.
+              --dry-run   Print exactly what would be sent to Claude, and stop.
+              --no-facts  Don't collect live facts from the Pis.
   help      Show this help.
   version   Show the version (the repo's current git commit).
 
-Requires the GitHub CLI (gh), authenticated, and jq.
+Requires the GitHub CLI (gh), authenticated, and jq. 'review' also needs
+Claude Code (claude) signed in, ansible for live facts, and perl.
+Model and effort: UPGRADES_REVIEW_MODEL (default $REVIEW_MODEL) and
+UPGRADES_REVIEW_EFFORT (default $REVIEW_EFFORT).
 EOF
 }
 
@@ -89,6 +107,233 @@ cmd_list() {
     printf '%s\n' "$rows"
 }
 
+# --- review ----------------------------------------------------------------
+
+# Where an image runs, and which collector describes it beyond the generic
+# container facts: "inventory-group|container|extra collector and its args".
+image_profile() {
+    local admin_user
+    admin_user=$(sed -n 's/^admin_user: *//p' "$REPO_ROOT/group_vars/pis/vars.yml")
+    case "$1" in
+        */home-assistant) echo "homeassistant_nodes|homeassistant|homeassistant.sh /home/$admin_user/services/homeassistant/config" ;;
+        */elasticsearch) echo "elasticsearch_nodes|elasticsearch|elasticsearch.sh" ;;
+        */pdc-agent) echo "elasticsearch_nodes|elasticsearch-grafana-pdc-1|" ;;
+        */tailscale) echo "tailscale_nodes|tailscale|" ;;
+    esac
+}
+
+# UPGRADES_PR_JSON / UPGRADES_PR_DIFF / UPGRADES_FACTS_FILE substitute saved
+# data for GitHub and the rack, so tests run without either.
+fetch_pr() {
+    if [[ -n "${UPGRADES_PR_JSON:-}" ]]; then
+        cat "$UPGRADES_PR_JSON"
+    else
+        gh pr view "$1" --json number,title,author,body,url,state
+    fi
+}
+
+fetch_pr_diff() {
+    if [[ -n "${UPGRADES_PR_DIFF:-}" ]]; then
+        cat "$UPGRADES_PR_DIFF"
+    else
+        gh pr diff "$1"
+    fi
+}
+
+# jq: package, update type and version change from a Renovate body table row
+# ("| [docker.elastic.co/x](...) | major | `1.0` → `2.0` |") or a Dependabot title.
+# shellcheck disable=SC2016  # $vars below are jq variables, not shell ones
+readonly UPGRADE_FILTER='
+. as $pr
+| ((.body // "" | capture("\\| *\\[(?<package>[^\\]]+)\\][^|]*\\| *(?<type>major|minor|patch|digest|pin|pinDigest)? *\\| *`(?<from>[^`]+)` → `(?<to>[^`]+)`")?)
+   // (.title | capture("[Bb]ump (?<package>\\S+) from (?<from>\\S+) to (?<to>\\S+)")? | . + {type: null})
+   // {package: .title, type: null, from: "?", to: "?"})
+| . + {number: $pr.number, title: $pr.title, author: ($pr.author.login | sub("^app/"; "")), url: $pr.url,
+       state: ($pr.state // "OPEN" | ascii_downcase)}
+'
+
+# Renovate puts release notes between "### Release Notes" and "### Configuration";
+# anything else (e.g. Dependabot) is used whole.
+readonly NOTES_FILTER='
+.body // ""
+| if test("### Release Notes") then split("### Release Notes")[1] | split("\n### Configuration")[0] else . end
+'
+
+# The version pin for a package and the role files that deploy it.
+repo_context() {
+    local package=$1 pin var role
+    pin=$(grep -h -A1 -F "depName=$package" "$REPO_ROOT"/group_vars/*/*.yml 2>/dev/null || true)
+    if [[ -z "$pin" ]]; then
+        echo "No container pin for $package in group_vars; see the PR diff."
+        return
+    fi
+    printf '=== group_vars (version pin) ===\n%s\n' "$pin"
+    var=$(printf '%s\n' "$pin" | sed -n 's/^\([a-z_]*\):.*/\1/p' | head -1)
+    for role in $(grep -rlw -- "$var" "$REPO_ROOT/roles" | sed "s|^$REPO_ROOT/roles/||; s|/.*||" | sort -u); do
+        while IFS= read -r file; do
+            printf '\n=== %s ===\n' "${file#"$REPO_ROOT"/}"
+            cat "$file"
+        done < <(find "$REPO_ROOT/roles/$role" -type f \( -name '*.yml' -o -name '*.j2' \) | sort)
+    done
+}
+
+run_collector() {
+    local group=$1 collector=$2
+    printf -- '--- %s ---\n' "${collector%% *}"
+    (cd "$REPO_ROOT" && ANSIBLE_LOAD_CALLBACK_PLUGINS=1 ANSIBLE_STDOUT_CALLBACK=json \
+        ansible "$group" -i inventory.yml -b -m ansible.builtin.script \
+        -a "scripts/collectors/$collector" </dev/null 2>/dev/null) |
+        jq -r '.plays[0].tasks[0].hosts | to_entries[].value
+               | if .failed then "Collector failed: \(.msg // .stderr // "unknown error")" else .stdout end' ||
+        echo "Collector failed: ansible did not run."
+}
+
+collect_facts() {
+    local package=$1 no_facts=$2 profile group container extra
+    if [[ -n "${UPGRADES_FACTS_FILE:-}" ]]; then
+        cat "$UPGRADES_FACTS_FILE"
+        return
+    fi
+    if ((no_facts)); then
+        echo "Not collected: --no-facts was given."
+        return
+    fi
+    if [[ ! -f "$REPO_ROOT/inventory.yml" ]]; then
+        echo "Not collected: no inventory.yml (run 'make inventory-pull')."
+        return
+    fi
+    profile=$(image_profile "$package")
+    if [[ -z "$profile" ]]; then
+        echo "Not collected: no collector is defined for $package."
+        return
+    fi
+    command -v ansible >/dev/null || { echo "Not collected: ansible is not installed."; return; }
+    IFS='|' read -r group container extra <<<"$profile"
+    echo "Collecting live facts from the rack ($group)..." >&2
+    run_collector "$group" "container.sh $container"
+    if [[ -n "$extra" ]]; then
+        run_collector "$group" "$extra"
+    fi
+}
+
+# Names and addresses to hide: every inventory host and its ansible_host.
+# UPGRADES_REDACT_HOSTS (space-separated) replaces the inventory, for tests.
+redact_hosts() {
+    if [[ -n "${UPGRADES_REDACT_HOSTS+set}" ]]; then
+        echo "$UPGRADES_REDACT_HOSTS"
+    elif [[ -f "$REPO_ROOT/inventory.yml" ]] && command -v ansible-inventory >/dev/null; then
+        (cd "$REPO_ROOT" && ansible-inventory -i inventory.yml --list </dev/null 2>/dev/null) |
+            jq -r '._meta.hostvars | to_entries[] | .key, (.value.ansible_host // empty)'
+    fi
+}
+
+# Replace hostnames (and any FQDN built on them), IPv4 addresses/CIDRs and
+# Tailscale MagicDNS names with placeholders.
+redact() {
+    REDACT_HOSTS="$(redact_hosts | tr '\n' ' ')" perl -pe '
+        BEGIN { @hosts = grep { length } split /\s+/, $ENV{REDACT_HOSTS} }
+        # Hostnames can contain "-", so it counts as part of a name: "pi-a"
+        # must not match inside "pi-ab" or "pi-a-tools".
+        for my $h (@hosts) { s/(?<![A-Za-z0-9-])\Q$h\E(?:\.[A-Za-z0-9-]+)*(?![A-Za-z0-9-])/<host>/gi }
+        s/\b(?:\d{1,3}\.){3}\d{1,3}(?:\/\d{1,2})?\b/<ip>/g;
+        s/\b[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.ts\.net\b/<tailnet-host>/gi;
+    '
+}
+
+# Untrusted text must not be able to close its section and start a fake one.
+defuse_tags() {
+    perl -pe 's{<(/?)(upgrade|deployment_context|live_facts|pr_diff|release_notes)\b}{<$1$2-quoted}gi'
+}
+
+build_payload() {
+    local pr=$1 no_facts=$2 pr_json upgrade package
+    pr_json=$(fetch_pr "$pr")
+    upgrade=$(jq -c "$UPGRADE_FILTER" <<<"$pr_json")
+    package=$(jq -r .package <<<"$upgrade")
+    echo "Reviewing #$pr: $package $(jq -r '"\(.from) → \(.to)"' <<<"$upgrade")" >&2
+
+    printf '<upgrade>\n'
+    jq -r '"package: \(.package)\nchange: \(.from) → \(.to)\(if .type then " (\(.type) update)" else "" end)\npull request: #\(.number) \"\(.title)\", opened by \(.author), \(.state)"' <<<"$upgrade"
+    printf '</upgrade>\n\n<deployment_context>\n'
+    repo_context "$package" | redact
+    printf '</deployment_context>\n\n<live_facts collected="%s">\n' "$(date -u +%Y-%m-%dT%H:%MZ)"
+    collect_facts "$package" "$no_facts" | redact
+    printf '</live_facts>\n\n<pr_diff>\n'
+    fetch_pr_diff "$pr" | redact | defuse_tags
+    printf '</pr_diff>\n\n<release_notes>\n'
+    jq -r "$NOTES_FILTER" <<<"$pr_json" | defuse_tags
+    printf '</release_notes>\n'
+}
+
+render_report() {
+    local bold="" dim="" reset="" red="" yellow="" green=""
+    if [[ -t 1 ]]; then
+        bold=$'\e[1m' dim=$'\e[2m' reset=$'\e[0m' red=$'\e[31m' yellow=$'\e[33m' green=$'\e[32m'
+    fi
+    jq -r --arg b "$bold" --arg d "$dim" --arg r "$reset" \
+        --arg red "$red" --arg yellow "$yellow" --arg green "$green" --arg model "$REVIEW_MODEL" '
+        def list: if length == 0 then "  (none)" else map("  • " + .) | join("\n") end;
+        .structured_output as $o
+        | ({high: $red, medium: $yellow, low: $green}[$o.risk]) as $c
+        | "\($b)\($c)RISK: \($o.risk | ascii_upcase)\($r)  \($d)(confidence: \($o.confidence))\($r)",
+          $o.headline, "",
+          "\($b)Changes that matter here\($r)",
+          (if ($o.relevant_changes | length) == 0 then "  (none)"
+           else $o.relevant_changes | map("  • \(.change)\n    \($d)→\($r) \(.why_it_matters_here)  \($d)[\(.source | gsub("_"; " "))]\($r)") | join("\n") end),
+          "", "\($b)Not relevant here\($r)", "  \($o.not_relevant_summary)",
+          "", "\($b)Before deploying\($r)", ($o.before_deploying | list),
+          "", "\($b)After deploying, check\($r)", ($o.after_deploying | list),
+          "", "\($b)Rollback\($r)", "  \($o.rollback)",
+          "", "\($b)Unknowns to verify\($r)", ($o.unknowns | list),
+          "", "\($d)Advisory review by \($model) in \(.duration_ms / 1000 | floor)s. Release notes are untrusted input; facts marked [general knowledge] are unverified.\($r)"
+    '
+}
+
+cmd_review() {
+    local pr="" dry_run=0 no_facts=0 arg payload work
+    for arg in "$@"; do
+        case "$arg" in
+            --dry-run) dry_run=1 ;;
+            --no-facts) no_facts=1 ;;
+            *) pr=$arg ;;
+        esac
+    done
+    if [[ ! "$pr" =~ ^[0-9]+$ ]]; then
+        echo "$PROG: review needs a PR number, e.g. '$PROG review 13' (see '$PROG list')" >&2
+        exit 2
+    fi
+
+    work=$(mktemp -d)
+    # shellcheck disable=SC2064  # expand $work now, while it is set
+    trap "rm -rf '$work'" EXIT
+    payload="$work/payload.txt"
+    build_payload "$pr" "$no_facts" >"$payload"
+
+    if ((dry_run)); then
+        cat "$payload"
+        return
+    fi
+
+    echo "Asking $REVIEW_MODEL (effort: $REVIEW_EFFORT); this can take a few minutes..." >&2
+    # Run from an empty directory with every Claude Code customisation (CLAUDE.md,
+    # hooks, skills, MCP servers, plugins) and every tool switched off, so the
+    # model can only read this payload and answer. It can't run commands, read
+    # files or reach the network, whatever the release notes say.
+    (cd "$work" && claude -p --safe-mode --tools "" --strict-mcp-config \
+        --disable-slash-commands --no-session-persistence \
+        --model "$REVIEW_MODEL" --effort "$REVIEW_EFFORT" --output-format json \
+        --system-prompt "$(cat "$REVIEW_DIR/system-prompt.md")" \
+        --json-schema "$(cat "$REVIEW_DIR/schema.json")" \
+        <"$payload") >"$work/result.json" || true
+
+    if ! jq -e '.structured_output.risk' "$work/result.json" >/dev/null 2>&1; then
+        echo "$PROG: the review did not complete:" >&2
+        jq -r '.result // .' "$work/result.json" >&2 2>/dev/null || cat "$work/result.json" >&2
+        exit 1
+    fi
+    render_report <"$work/result.json"
+}
+
 cmd_version() {
     echo "$PROG $(git -C "$(dirname "$0")" describe --always --dirty 2>/dev/null || echo unknown)"
 }
@@ -103,6 +348,14 @@ main() {
             require jq
             [[ -n "${UPGRADES_PRS_JSON:-}" ]] || require gh
             cmd_list
+            ;;
+        review)
+            shift
+            require jq
+            require perl
+            [[ -n "${UPGRADES_PR_JSON:-}" ]] || require gh
+            [[ " $* " == *" --dry-run "* ]] || require claude
+            cmd_review "$@"
             ;;
         help | -h | --help) usage ;;
         version | --version) cmd_version ;;

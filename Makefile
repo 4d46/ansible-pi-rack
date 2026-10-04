@@ -9,7 +9,7 @@ PLAYBOOK  := site.yml
 # or Ctrl-C) and leaves the playbook's exit code for make to see.
 WITH_VAULT_CLEANUP := trap 'rm -f $(VAULT_YML)' EXIT INT TERM;
 
-.PHONY: deploy deploy-bootstrap check clean lint test deps versions upgrades _inject
+.PHONY: deploy deploy-bootstrap check clean lint test deps versions upgrades upgrade-review _inject
 
 # Normal idempotent re-run (admin SSH key must already be deployed)
 deploy: _inject
@@ -82,6 +82,12 @@ versions:
 # find PR numbers without the GitHub web UI. See: scripts/upgrades help
 upgrades:
 	@scripts/upgrades list
+
+# AI risk review of one upgrade PR: advisory, read-only, prints to the terminal.
+# Usage: make upgrade-review PR=13    (ARGS=--dry-run shows exactly what is sent)
+upgrade-review:
+	@test -n "$(PR)" || { echo "Usage: make upgrade-review PR=<number>   (find numbers with: make upgrades)"; exit 2; }
+	@scripts/upgrades review $(PR) $(ARGS)
 
 deps:
 	ansible-galaxy collection install -r requirements.yml
