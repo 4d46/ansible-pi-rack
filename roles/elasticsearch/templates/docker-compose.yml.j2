@@ -1,6 +1,6 @@
 services:
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    image: docker.elastic.co/elasticsearch/elasticsearch:{{ es_image_tag }}
     container_name: elasticsearch
     environment:
       - node.name=elasticsearch
@@ -22,7 +22,7 @@ services:
       - es_data:/usr/share/elasticsearch/data
     restart: unless-stopped
   grafana-pdc:
-    image: grafana/pdc-agent:latest
+    image: grafana/pdc-agent:{{ grafana_pdc_image_tag }}
     command: ["-token", "${GRAFANA_PDC_TOKEN}", "-cluster", "${GRAFANA_PDC_CLUSTER}", "-gcloud-hosted-grafana-id", "${GRAFANA_PDC_HOSTED_GRAFANA_ID}"]
     restart: unless-stopped
 

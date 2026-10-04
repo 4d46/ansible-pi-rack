@@ -36,5 +36,21 @@ tls_hostname_fqdn: "{{ vault_tls_hostname_fqdn }}"
 tls_acme_email: "{{ vault_le_email }}"
 certbot_cert_dir: "/etc/letsencrypt/live/{{ tls_hostname_fqdn }}"
 
-# Home Assistant
+# Container image tags
+# Every image is pinned here so git records exactly what runs on the rack.
+# Renovate reads the "# renovate:" comment above each tag and opens a PR when
+# upstream publishes a newer one; merging and deploying is what upgrades the
+# container. Never use :latest - compose only pulls missing images, so it
+# freezes at whatever was first pulled with no record of which version that is.
+
+# renovate: datasource=docker depName=ghcr.io/home-assistant/home-assistant
 ha_image_tag: "2026.9.2"
+
+# renovate: datasource=docker depName=docker.elastic.co/elasticsearch/elasticsearch
+es_image_tag: "8.13.4"
+
+# renovate: datasource=docker depName=grafana/pdc-agent
+grafana_pdc_image_tag: "0.0.59"
+
+# renovate: datasource=docker depName=tailscale/tailscale
+tailscale_image_tag: "v1.98.4"
