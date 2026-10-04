@@ -68,12 +68,13 @@ _inject:
 # started from with the first 12 hex digits of its pinned digest. docker ps
 # hides the digest part of an image reference, so it is read with inspect.
 # Compare against the *_image_tag pins in group_vars/pis/vars.yml to spot drift.
+# Fixed column widths keep every host's lines aligned with each other.
 # {% raw %} stops Ansible treating Docker's Go-template braces as Jinja.
 versions:
 	@ansible all -i $(INVENTORY) -b -m ansible.builtin.shell \
 		-a 'docker ps --format "{% raw %}{{.Names}}|{{.Status}}{% endraw %}" \
 			| while IFS="|" read -r name status; do \
-				printf "%s\t%s\t%s\n" "$$name" "$$status" \
+				printf "%-28s  %-18s  %s\n" "$$name" "$$status" \
 					"$$(docker inspect --format "{% raw %}{{.Config.Image}}{% endraw %}" "$$name")"; \
 			done | sed -E "s/(@sha256:[0-9a-f]{12})[0-9a-f]+/\1/"'
 
