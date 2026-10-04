@@ -69,6 +69,7 @@ pull request: #13 "Update docker.elastic.co/elasticsearch/elasticsearch Docker t
     "$(payload pr-13 | section upgrade)"
 
 notes=$(payload pr-13 | section release_notes)
+# shellcheck disable=SC2016  # the backticks are literal Markdown in Renovate's notes
 check "review keeps the release notes but not Renovate's footer" \
     "first=yes footer=no debug=no" \
     "first=$(grep -q '^### \[`v9.5.4`\]' <<<"$notes" && echo yes || echo no) footer=$(grep -q '### Configuration' <<<"$notes" && echo yes || echo no) debug=$(grep -q 'renovate-debug' <<<"$notes" && echo yes || echo no)"

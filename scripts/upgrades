@@ -169,12 +169,12 @@ repo_context() {
     fi
     printf '=== group_vars (version pin) ===\n%s\n' "$pin"
     var=$(printf '%s\n' "$pin" | sed -n 's/^\([a-z_]*\):.*/\1/p' | head -1)
-    for role in $(grep -rlw -- "$var" "$REPO_ROOT/roles" | sed "s|^$REPO_ROOT/roles/||; s|/.*||" | sort -u); do
+    while IFS= read -r role; do
         while IFS= read -r file; do
             printf '\n=== %s ===\n' "${file#"$REPO_ROOT"/}"
             cat "$file"
         done < <(find "$REPO_ROOT/roles/$role" -type f \( -name '*.yml' -o -name '*.j2' \) | sort)
-    done
+    done < <(grep -rlw -- "$var" "$REPO_ROOT/roles" | sed "s|^$REPO_ROOT/roles/||; s|/.*||" | sort -u)
 }
 
 run_collector() {
