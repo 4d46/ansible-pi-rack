@@ -38,19 +38,23 @@ certbot_cert_dir: "/etc/letsencrypt/live/{{ tls_hostname_fqdn }}"
 
 # Container image tags
 # Every image is pinned here so git records exactly what runs on the rack.
+# Pins are "tag@sha256:digest": the tag is for humans, the digest is what Docker
+# enforces, so a tag re-pointed upstream can't change what gets pulled. Use the
+# multi-arch index digest (what the registry serves for the tag) so it resolves
+# on arm64; Renovate keeps both parts current once a digest is present.
 # Renovate reads the "# renovate:" comment above each tag and opens a PR when
 # upstream publishes a newer one; merging and deploying is what upgrades the
 # container. Never use :latest - compose only pulls missing images, so it
 # freezes at whatever was first pulled with no record of which version that is.
 
 # renovate: datasource=docker depName=ghcr.io/home-assistant/home-assistant
-ha_image_tag: "2026.9.4"
+ha_image_tag: "2026.9.4@sha256:3e6710a7ab2a61311d9d899b719f6c3657791c63e8f4942cec4ebc42401d6b76"
 
 # renovate: datasource=docker depName=docker.elastic.co/elasticsearch/elasticsearch
-es_image_tag: "8.13.4"
+es_image_tag: "8.13.4@sha256:dfd318b417be1356d9c7fdd6a5577c8a45553ac9d34354929a416c69c85daa9f"
 
 # renovate: datasource=docker depName=grafana/pdc-agent
-grafana_pdc_image_tag: "0.0.66"
+grafana_pdc_image_tag: "0.0.66@sha256:768a5dba4d6472a5bcadd009860ac8f723a865e3562e388b402207164962e2ef"
 
 # renovate: datasource=docker depName=tailscale/tailscale
-tailscale_image_tag: "v1.98.4"
+tailscale_image_tag: "v1.98.4@sha256:25cde9ad76020b0e29229136d0c38b5962e9a0e1774ffac9b0df68e4a37d6cf0"

@@ -30,14 +30,16 @@
     - homeassistant_container.container.Config.Image != homeassistant_image
   vars:
     homeassistant_backup_file: >-
-      {{ homeassistant_backup_dir }}/pre-upgrade-{{ homeassistant_container.container.Config.Image | regex_replace('^.*:', '') }}-{{
+      {{ homeassistant_backup_dir }}/pre-upgrade-{{ homeassistant_container.container.Config.Image | regex_replace('@.*$', '') | regex_replace('^.*:', '') }}-{{
       ansible_facts['date_time']['iso8601_basic_short'] }}.tar.gz
   block:
     # Pull first so HA isn't down for the download, and a bad tag fails here
-    # while the old container is still running.
+    # while the old container is still running. The tag is dropped because this
+    # module misparses "name:tag@digest" (it pulls, then tags the image :latest);
+    # "name@digest" pulls exactly the same image.
     - name: Pull the new Home Assistant image
       community.docker.docker_image_pull:
-        name: "{{ homeassistant_image }}"
+        name: "{{ homeassistant_image | regex_replace(':[^:/@]+@', '@') }}"
 
     # Root-only: the archive holds secrets.yaml and .storage/auth (password
     # hashes and tokens) in a single file that is easy to copy elsewhere.

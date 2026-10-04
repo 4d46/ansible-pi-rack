@@ -69,7 +69,9 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
 ### Container Versions
 Every container image is pinned to an explicit tag in `group_vars/pis/vars.yml` (`*_image_tag`) — never `:latest`. Compose only pulls an image when it is missing, so `:latest` silently freezes at whatever was first pulled.
 
-[Renovate](https://docs.renovatebot.com/) watches those pins via the `# renovate:` comment above each one and opens a PR when a newer image is published. Its **Dependency Dashboard** issue lists every image and any pending updates. To upgrade:
+Each pin is `tag@sha256:digest`. The tag is for people to read; the digest is the image's content hash, and Docker refuses anything that doesn't match it. A tag that is re-pointed upstream (a compromised publisher account, or a legitimate rebuild) therefore can't change what gets deployed without a PR. Use the multi-arch index digest that the registry serves for the tag, so it resolves on the Pis' arm64. When adding a new image, include its digest. Renovate only updates digests that are already present.
+
+[Renovate](https://docs.renovatebot.com/) watches those pins via the `# renovate:` comment above each one. It opens a PR that updates the tag and digest together when a newer image is published, and a digest-only PR if an existing tag is re-pushed. Its **Dependency Dashboard** issue lists every image and any pending updates. To upgrade:
 
 1. Review and merge the Renovate PR (check the linked release notes for breaking changes).
 2. `make deploy` — changing the tag makes Compose pull the new image and recreate the container.
