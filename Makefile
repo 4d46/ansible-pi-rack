@@ -9,7 +9,7 @@ PLAYBOOK  := site.yml
 # or Ctrl-C) and leaves the playbook's exit code for make to see.
 WITH_VAULT_CLEANUP := trap 'rm -f $(VAULT_YML)' EXIT INT TERM;
 
-.PHONY: deploy deploy-bootstrap check clean lint deps versions _inject
+.PHONY: deploy deploy-bootstrap check clean lint test deps versions upgrades _inject
 
 # Normal idempotent re-run (admin SSH key must already be deployed)
 deploy: _inject
@@ -78,12 +78,20 @@ versions:
 					"$$(docker inspect --format "{% raw %}{{.Config.Image}}{% endraw %}" "$$name")"; \
 			done | sed -E "s/(@sha256:[0-9a-f]{12})[0-9a-f]+/\1/"'
 
+# List open Renovate/Dependabot PRs with their version changes, so you can
+# find PR numbers without the GitHub web UI. See: scripts/upgrades help
+upgrades:
+	@scripts/upgrades list
+
 deps:
 	ansible-galaxy collection install -r requirements.yml
 	pip install -r requirements.txt
 
 lint:
 	ansible-lint $(PLAYBOOK)
+
+test:
+	scripts/tests/test_upgrades.sh
 
 clean:
 	rm -f $(VAULT_YML)

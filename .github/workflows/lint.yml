@@ -25,3 +25,10 @@ jobs:
 
       - name: Run ansible-lint
         run: ansible-lint site.yml
+
+      # shellcheck and jq are preinstalled on GitHub's Ubuntu runners.
+      - name: ShellCheck scripts
+        run: shellcheck scripts/upgrades scripts/tests/test_upgrades.sh
+
+      - name: Test scripts
+        run: scripts/tests/test_upgrades.sh
