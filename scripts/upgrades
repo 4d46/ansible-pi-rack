@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+# upgrades - see what dependency updates are waiting, without the GitHub web UI.
+#
+# Reads open pull requests from Renovate (container images) and Dependabot
+# (Actions, pip, collections) with the GitHub CLI. Read-only: it never
+# comments on, approves or merges anything.
+set -euo pipefail
+
+readonly PROG="upgrades"
+
+usage() {
+    cat <<EOF
+Usage: $PROG <command>
+
+Commands:
+  list      List open Renovate and Dependabot PRs: number, package, version
+            change, update type, CI checks, mergeability and age.
+  help      Show this help.
+  version   Show the version (the repo's current git commit).
+
+Requires the GitHub CLI (gh), authenticated, and jq.
+EOF
+}
+
+# jq filter: one aligned row per dependency PR, from 'gh pr list --json'.
+# Renovate states the change in its body table ("| major | \`8.19.22\` → \`9.5.4\` |");
+# Dependabot states it in the title ("Bump x from 4 to 5").
+# shellcheck disable=SC2016  # $vars below are jq variables, not shell ones
+readonly LIST_FILTER='
+def checks:
+  [.statusCheckRollup[]? | (.conclusion // .state // "PENDING")] as $c
+  | if ($c | length) == 0 then "no checks"
+    elif any($c[]; test("FAILURE|ERROR|CANCELLED|TIMED_OUT|ACTION_REQUIRED")) then "checks ✗"
+    elif any($c[]; test("PENDING|EXPECTED|QUEUED|IN_PROGRESS") or . == "") then "checks …"
+    else "checks ✓" end;
+
+def change:
+  (.body // "" | capture("\\| *(?<type>major|minor|patch|digest|pin|pinDigest)? *\\| *`(?<from>[^`]+)` → `(?<to>[^`]+)`")?)
+  // (.title | capture("from (?<from>\\S+) to (?<to>\\S+)")? | . + {type: "-"})
+  // {type: "-", from: "?", to: "?"};
+
+def package:
+  .title
+  | sub("^(Update|Bump|chore\\(deps\\): bump) "; "")
+  | sub(" (Docker tag|digest) to .*$"; "")
+  | sub(" from \\S+ to \\S+$"; "")
+  | sub("^.*/"; "");
+
+# Pad every column to its widest cell (jq counts characters, so the arrows and
+# ticks line up the same on macOS and Linux, unlike column(1)).
+def align:
+  (map(map(length)) | transpose | map(max)) as $w
+  | .[] | [range(length) as $i | .[$i] + " " * ($w[$i] - (.[$i] | length))]
+  | join("  ") | sub(" +$"; "");
+
+[ .[] | select(.author.login | test("renovate|dependabot")) ]
+| sort_by(.number)
+| map(change as $c
+| [ "#\(.number)",
+    package,
+    "\($c.from) → \($c.to)",
+    ($c.type // "-"),
+    checks,
+    (.mergeable | ascii_downcase),
+    (.author.login | sub("^app/"; "") | sub("\\[bot\\]$"; "")),
+    "opened \(.createdAt[:10])"
+  ])
+| if length == 0 then empty else align end
+'
+
+# Fetch open PRs as JSON. UPGRADES_PRS_JSON points at a saved response instead,
+# so the parsing can be tested without GitHub (see scripts/tests/).
+fetch_prs() {
+    if [[ -n "${UPGRADES_PRS_JSON:-}" ]]; then
+        cat "$UPGRADES_PRS_JSON"
+    else
+        gh pr list --state open --limit 100 \
+            --json number,title,author,body,createdAt,mergeable,statusCheckRollup
+    fi
+}
+
+cmd_list() {
+    local rows
+    rows=$(fetch_prs | jq -r "$LIST_FILTER")
+    if [[ -z "$rows" ]]; then
+        echo "No open dependency PRs."
+        return
+    fi
+    printf '%s\n' "$rows"
+}
+
+cmd_version() {
+    echo "$PROG $(git -C "$(dirname "$0")" describe --always --dirty 2>/dev/null || echo unknown)"
+}
+
+require() {
+    command -v "$1" >/dev/null 2>&1 || { echo "$PROG: '$1' is required but not installed" >&2; exit 1; }
+}
+
+main() {
+    case "${1:-help}" in
+        list)
+            require jq
+            [[ -n "${UPGRADES_PRS_JSON:-}" ]] || require gh
+            cmd_list
+            ;;
+        help | -h | --help) usage ;;
+        version | --version) cmd_version ;;
+        *)
+            echo "$PROG: unknown command '$1'" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+}
+
+main "$@"

@@ -46,6 +46,14 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
 - `make deps`: Install required Ansible collections and Python dependencies.
 - `make lint`: Run `ansible-lint` on the playbook.
 - `make clean`: Remove generated `vault.yml` and cache files.
+- `make test`: Run the tests for the helper scripts in `scripts/` (also run in CI).
+
+### Dependency Updates
+- `make upgrades`: List the open Renovate and Dependabot PRs without opening GitHub: PR number, package, version change, update type (major/minor/patch), CI status, mergeability and age.
+  ```
+  #13  elasticsearch  8.19.22 → 9.5.4  major  checks ✓  mergeable  renovate  opened 2026-10-04
+  ```
+  This is `scripts/upgrades list`; run `scripts/upgrades help` for all commands. It needs the GitHub CLI (`gh auth login`) and `jq`, and is read-only.
 
 ### Inventory Management (1Password Sync)
 - `make inventory-pull`: Fetch the `inventory.yml` stored in 1Password.

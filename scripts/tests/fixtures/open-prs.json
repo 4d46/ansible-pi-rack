@@ -1,0 +1,102 @@
+[
+  {
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "body": "This PR contains the following updates:\n\n| Package | Update | Change |\n|---|---|---|\n| [docker.elastic.co/elasticsearch/elasticsearch](https://www.elastic.co/products/elasticsearch) ([source](https://redirect.github.com/elastic/elasticsearch)) | major | `8.19.22` → `9.5.4` |\n\n",
+    "createdAt": "2026-10-04T13:08:13Z",
+    "mergeable": "MERGEABLE",
+    "number": 13,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "name": "lint",
+        "status": "COMPLETED",
+        "conclusion": "SUCCESS"
+      }
+    ],
+    "title": "Update docker.elastic.co/elasticsearch/elasticsearch Docker tag to v9"
+  },
+  {
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "body": "This PR contains the following updates:\n\n| Package | Update | Change |\n|---|---|---|\n| [docker.elastic.co/elasticsearch/elasticsearch](https://www.elastic.co/products/elasticsearch) ([source](https://redirect.github.com/elastic/elasticsearch)) | minor | `8.13.4` → `8.19.22` |\n\n",
+    "createdAt": "2026-10-04T12:01:29Z",
+    "mergeable": "UNKNOWN",
+    "number": 10,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "name": "lint",
+        "status": "IN_PROGRESS",
+        "conclusion": ""
+      }
+    ],
+    "title": "Update docker.elastic.co/elasticsearch/elasticsearch Docker tag to v8.19.22"
+  },
+  {
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "body": "This PR contains the following updates:\n\n| Package | Update | Change |\n|---|---|---|\n| [tailscale/tailscale](https://tailscale.com/kb/1282/docker) ([source](https://redirect.github.com/tailscale/tailscale)) | minor | `v1.98.4` → `v1.102.5` |\n\n",
+    "createdAt": "2026-10-04T12:01:35Z",
+    "mergeable": "CONFLICTING",
+    "number": 11,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "name": "lint",
+        "status": "COMPLETED",
+        "conclusion": "SUCCESS"
+      }
+    ],
+    "title": "Update tailscale/tailscale Docker tag to v1.102.5"
+  },
+  {
+    "author": {
+      "is_bot": true,
+      "login": "app/renovate"
+    },
+    "body": "This PR contains the following updates:\n\n| Package | Update | Change |\n|---|---|---|\n| grafana/pdc-agent | patch | `0.0.59` → `0.0.66` |\n\n",
+    "createdAt": "2026-10-04T11:51:08Z",
+    "mergeable": "UNKNOWN",
+    "number": 8,
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "name": "lint",
+        "status": "COMPLETED",
+        "conclusion": "FAILURE"
+      }
+    ],
+    "title": "Update grafana/pdc-agent Docker tag to v0.0.66"
+  },
+  {
+    "number": 21,
+    "title": "Bump actions/checkout from 4 to 5",
+    "author": {
+      "login": "app/dependabot",
+      "is_bot": true
+    },
+    "body": "Bumps [actions/checkout](https://github.com/actions/checkout) from 4 to 5.\n",
+    "createdAt": "2026-10-05T06:00:00Z",
+    "mergeable": "MERGEABLE",
+    "statusCheckRollup": []
+  },
+  {
+    "number": 20,
+    "title": "Align make versions columns across hosts",
+    "author": {
+      "login": "4d46",
+      "is_bot": false
+    },
+    "body": "## Why\n",
+    "createdAt": "2026-10-04T15:00:00Z",
+    "mergeable": "MERGEABLE",
+    "statusCheckRollup": []
+  }
+]

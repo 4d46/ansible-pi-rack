@@ -1,0 +1,5 @@
+#8   pdc-agent      0.0.59 → 0.0.66     patch  checks ✗   unknown      renovate    opened 2026-10-04
+#10  elasticsearch  8.13.4 → 8.19.22    minor  checks …   unknown      renovate    opened 2026-10-04
+#11  tailscale      v1.98.4 → v1.102.5  minor  checks ✓   conflicting  renovate    opened 2026-10-04
+#13  elasticsearch  8.19.22 → 9.5.4     major  checks ✓   mergeable    renovate    opened 2026-10-04
+#21  checkout       4 → 5               -      no checks  mergeable    dependabot  opened 2026-10-05
