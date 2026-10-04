@@ -8,10 +8,10 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Container image tags pinned in group_vars with a '# renovate:' comment",
+      "description": "Container image pins (tag@sha256:digest) in group_vars with a '# renovate:' comment",
       "managerFilePatterns": ["/^group_vars/.+\\.ya?ml$/"],
       "matchStrings": [
-        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n[^:\\n]+:\\s*\"?(?<currentValue>[^\"\\s]+)\"?"
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)\\s*\\n[^:\\n]+:\\s*\"?(?<currentValue>[^\"@\\s]+)(?:@(?<currentDigest>sha256:[a-f0-9]+))?\"?"
       ]
     }
   ]
