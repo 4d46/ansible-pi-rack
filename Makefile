@@ -3,7 +3,7 @@ VAULT_YML := group_vars/pis/vault.yml
 INVENTORY := inventory.yml
 PLAYBOOK  := site.yml
 
-.PHONY: deploy deploy-bootstrap check clean lint deps _inject
+.PHONY: deploy deploy-bootstrap check clean lint deps versions _inject
 
 # Normal idempotent re-run (admin SSH key must already be deployed)
 deploy: _inject
@@ -60,6 +60,13 @@ _inventory_check:
 _inject:
 	@echo "Injecting secrets from 1Password..."
 	op inject -f -i $(VAULT_TPL) -o $(VAULT_YML)
+
+# Show the image each running container was started from, per Pi. Compare
+# against the *_image_tag pins in group_vars/pis/vars.yml to spot drift.
+# {% raw %} stops Ansible treating Docker's Go-template braces as Jinja.
+versions:
+	@ansible all -i $(INVENTORY) -b -m ansible.builtin.command \
+		-a "docker ps --format '{% raw %}{{.Names}}\t{{.Image}}\t{{.Status}}{% endraw %}'"
 
 deps:
 	ansible-galaxy collection install -r requirements.yml

@@ -1,6 +1,6 @@
 services:
   tailscale:
-    image: tailscale/tailscale:latest
+    image: tailscale/tailscale:{{ tailscale_image_tag }}
     container_name: tailscale
     hostname: "${TS_HOSTNAME}"
     network_mode: host

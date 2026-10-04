@@ -66,6 +66,17 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
   make check
   ```
 
+### Container Versions
+Every container image is pinned to an explicit tag in `group_vars/pis/vars.yml` (`*_image_tag`) — never `:latest`. Compose only pulls an image when it is missing, so `:latest` silently freezes at whatever was first pulled.
+
+[Renovate](https://docs.renovatebot.com/) watches those pins via the `# renovate:` comment above each one and opens a PR when a newer image is published. Its **Dependency Dashboard** issue lists every image and any pending updates. To upgrade:
+
+1. Review and merge the Renovate PR (check the linked release notes for breaking changes).
+2. `make deploy` — changing the tag makes Compose pull the new image and recreate the container.
+3. `make versions` — confirm each Pi is running the pinned image.
+
+Dependabot still handles GitHub Actions, Ansible collections and pip; Renovate only handles container images (`enabledManagers` in `renovate.json`).
+
 ### Onboard Radios (Bluetooth / Wi-Fi)
 The rack is wired, so onboard Bluetooth and Wi-Fi are disabled on every Pi by default (`group_vars/pis/vars.yml`):
 
