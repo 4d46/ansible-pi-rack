@@ -3,7 +3,7 @@
   "extends": [
     "config:recommended"
   ],
-  "enabledManagers": ["custom.regex"],
+  "enabledManagers": ["custom.regex", "ansible-galaxy"],
   "labels": ["dependencies"],
   "customManagers": [
     {
