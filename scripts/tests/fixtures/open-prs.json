@@ -88,6 +88,25 @@
     "statusCheckRollup": []
   },
   {
+    "number": 24,
+    "title": "Bump ansible-lint requirement from >=24.0.0 to >=26.9.0",
+    "author": {
+      "login": "app/dependabot",
+      "is_bot": true
+    },
+    "body": "Updates the requirements on [ansible-lint](https://github.com/ansible/ansible-lint) to permit the latest version.\n",
+    "createdAt": "2026-10-04T18:05:00Z",
+    "mergeable": "MERGEABLE",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "name": "lint",
+        "status": "COMPLETED",
+        "conclusion": "SUCCESS"
+      }
+    ]
+  },
+  {
     "number": 20,
     "title": "Align make versions columns across hosts",
     "author": {

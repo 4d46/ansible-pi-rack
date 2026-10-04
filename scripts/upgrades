@@ -40,6 +40,20 @@ UPGRADES_REVIEW_EFFORT (default $REVIEW_EFFORT).
 EOF
 }
 
+# jq definition shared by the list and review filters: classify a version change
+# as major/minor/patch by comparing numbers (">=24.0.0" -> "26.9.0" is major).
+# Dependabot doesn't state the update type the way Renovate does.
+# shellcheck disable=SC2016  # $vars below are jq variables, not shell ones
+readonly VERSION_DEFS='
+def version_bump($from; $to):
+  def parts: sub("^[^0-9]*"; "") | split(".") | map((capture("^(?<n>[0-9]+)").n)? // "0" | tonumber);
+  ($from | parts) as $f | ($to | parts) as $t
+  | if $f == $t then null
+    elif $f[0] != $t[0] then "major"
+    elif ($f[1] // 0) != ($t[1] // 0) then "minor"
+    else "patch" end;
+'
+
 # jq filter: one aligned row per dependency PR, from 'gh pr list --json'.
 # Renovate states the change in its body table ("| major | \`8.19.22\` → \`9.5.4\` |");
 # Dependabot states it in the title ("Bump x from 4 to 5").
@@ -54,7 +68,7 @@ def checks:
 
 def change:
   (.body // "" | capture("\\| *(?<type>major|minor|patch|digest|pin|pinDigest)? *\\| *`(?<from>[^`]+)` → `(?<to>[^`]+)`")?)
-  // (.title | capture("from (?<from>\\S+) to (?<to>\\S+)")? | . + {type: "-"})
+  // (.title | capture("from (?<from>\\S+) to (?<to>\\S+)")? | . + {type: (version_bump(.from; .to) // "-")})
   // {type: "-", from: "?", to: "?"};
 
 def package:
@@ -62,6 +76,7 @@ def package:
   | sub("^(Update|Bump|chore\\(deps\\): bump) "; "")
   | sub(" (Docker tag|digest) to .*$"; "")
   | sub(" from \\S+ to \\S+$"; "")
+  | sub(" requirement$"; "")
   | sub("^.*/"; "");
 
 # Pad every column to its widest cell (jq counts characters, so the arrows and
@@ -99,7 +114,7 @@ fetch_prs() {
 
 cmd_list() {
     local rows
-    rows=$(fetch_prs | jq -r "$LIST_FILTER")
+    rows=$(fetch_prs | jq -r "$VERSION_DEFS$LIST_FILTER")
     if [[ -z "$rows" ]]; then
         echo "No open dependency PRs."
         return
@@ -146,7 +161,7 @@ fetch_pr_diff() {
 readonly UPGRADE_FILTER='
 . as $pr
 | ((.body // "" | capture("\\| *\\[(?<package>[^\\]]+)\\][^|]*\\| *(?<type>major|minor|patch|digest|pin|pinDigest)? *\\| *`(?<from>[^`]+)` → `(?<to>[^`]+)`")?)
-   // (.title | capture("[Bb]ump (?<package>\\S+) from (?<from>\\S+) to (?<to>\\S+)")? | . + {type: null})
+   // (.title | capture("[Bb]ump (?<package>\\S+)(?: requirement)? from (?<from>\\S+) to (?<to>\\S+)")? | . + {type: version_bump(.from; .to)})
    // {package: .title, type: null, from: "?", to: "?"})
 | . + {number: $pr.number, title: $pr.title, author: ($pr.author.login | sub("^app/"; "")), url: $pr.url,
        state: ($pr.state // "OPEN" | ascii_downcase)}
@@ -159,12 +174,21 @@ readonly NOTES_FILTER='
 | if test("### Release Notes") then split("### Release Notes")[1] | split("\n### Configuration")[0] else . end
 '
 
-# The version pin for a package and the role files that deploy it.
+# The version pin for a package and the role files that deploy it. Anything
+# without a container pin (Actions, pip, collections) gets the files the PR
+# changes in full instead, since a diff hides the surrounding context (e.g. a
+# workflow's triggers).
 repo_context() {
-    local package=$1 pin var role
+    local package=$1 diff=$2 pin var role path
     pin=$(grep -h -A1 -F "depName=$package" "$REPO_ROOT"/group_vars/*/*.yml 2>/dev/null || true)
     if [[ -z "$pin" ]]; then
-        echo "No container pin for $package in group_vars; see the PR diff."
+        echo "No container pin for $package; the files this PR changes, as they are before the change:"
+        while IFS= read -r path; do
+            if [[ -f "$REPO_ROOT/$path" ]]; then
+                printf '\n=== %s ===\n' "$path"
+                cat "$REPO_ROOT/$path"
+            fi
+        done < <(sed -n 's|^+++ b/||p' <<<"$diff" | sort -u)
         return
     fi
     printf '=== group_vars (version pin) ===\n%s\n' "$pin"
@@ -246,20 +270,21 @@ defuse_tags() {
 }
 
 build_payload() {
-    local pr=$1 no_facts=$2 pr_json upgrade package
+    local pr=$1 no_facts=$2 pr_json upgrade package diff
     pr_json=$(fetch_pr "$pr")
-    upgrade=$(jq -c "$UPGRADE_FILTER" <<<"$pr_json")
+    diff=$(fetch_pr_diff "$pr")
+    upgrade=$(jq -c "$VERSION_DEFS$UPGRADE_FILTER" <<<"$pr_json")
     package=$(jq -r .package <<<"$upgrade")
     echo "Reviewing #$pr: $package $(jq -r '"\(.from) → \(.to)"' <<<"$upgrade")" >&2
 
     printf '<upgrade>\n'
     jq -r '"package: \(.package)\nchange: \(.from) → \(.to)\(if .type then " (\(.type) update)" else "" end)\npull request: #\(.number) \"\(.title)\", opened by \(.author), \(.state)"' <<<"$upgrade"
     printf '</upgrade>\n\n<deployment_context>\n'
-    repo_context "$package" | redact
+    repo_context "$package" "$diff" | redact
     printf '</deployment_context>\n\n<live_facts collected="%s">\n' "$(date -u +%Y-%m-%dT%H:%MZ)"
     collect_facts "$package" "$no_facts" | redact
     printf '</live_facts>\n\n<pr_diff>\n'
-    fetch_pr_diff "$pr" | redact | defuse_tags
+    printf '%s\n' "$diff" | redact | defuse_tags
     printf '</pr_diff>\n\n<release_notes>\n'
     jq -r "$NOTES_FILTER" <<<"$pr_json" | defuse_tags
     printf '</release_notes>\n'
