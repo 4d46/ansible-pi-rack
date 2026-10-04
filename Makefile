@@ -64,14 +64,18 @@ _inject:
 	@echo "Injecting secrets from 1Password..."
 	op inject -f -i $(VAULT_TPL) -o $(VAULT_YML)
 
-# Show the image each running container was started from, per Pi, including
-# the first 12 hex digits of its pinned digest (docker ps hides the digest).
+# Show each running container, how long it has been up, and the image it was
+# started from with the first 12 hex digits of its pinned digest. docker ps
+# hides the digest part of an image reference, so it is read with inspect.
 # Compare against the *_image_tag pins in group_vars/pis/vars.yml to spot drift.
 # {% raw %} stops Ansible treating Docker's Go-template braces as Jinja.
 versions:
 	@ansible all -i $(INVENTORY) -b -m ansible.builtin.shell \
-		-a "docker ps -q | xargs -r docker inspect --format '{% raw %}{{.Name}}|{{.Config.Image}}|started {{.State.StartedAt}}{% endraw %}' \
-			| sed -E 's|^/||; s|[|]|\t|g; s|(@sha256:[0-9a-f]{12})[0-9a-f]+|\1|; s|T([0-9:]{5}):[0-9.]+Z$$| \1Z|'"
+		-a 'docker ps --format "{% raw %}{{.Names}}|{{.Status}}{% endraw %}" \
+			| while IFS="|" read -r name status; do \
+				printf "%s\t%s\t%s\n" "$$name" "$$status" \
+					"$$(docker inspect --format "{% raw %}{{.Config.Image}}{% endraw %}" "$$name")"; \
+			done | sed -E "s/(@sha256:[0-9a-f]{12})[0-9a-f]+/\1/"'
 
 deps:
 	ansible-galaxy collection install -r requirements.yml
