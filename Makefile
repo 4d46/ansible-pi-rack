@@ -3,27 +3,30 @@ VAULT_YML := group_vars/pis/vault.yml
 INVENTORY := inventory.yml
 PLAYBOOK  := site.yml
 
+# Prefix for any recipe that runs with the decrypted vault on disk. Each recipe
+# line is its own shell, so a separate 'rm' line never runs once the playbook
+# fails. The trap removes the vault however the shell ends (success, failure
+# or Ctrl-C) and leaves the playbook's exit code for make to see.
+WITH_VAULT_CLEANUP := trap 'rm -f $(VAULT_YML)' EXIT INT TERM;
+
 .PHONY: deploy deploy-bootstrap check clean lint deps versions _inject
 
 # Normal idempotent re-run (admin SSH key must already be deployed)
 deploy: _inject
-	ansible-playbook -i $(INVENTORY) $(PLAYBOOK) $(ARGS)
-	@rm -f $(VAULT_YML)
+	$(WITH_VAULT_CLEANUP) ansible-playbook -i $(INVENTORY) $(PLAYBOOK) $(ARGS)
 
 # First-run: Pi Imager creates admin user with password auth
 # We disable SSH hardening here as a safety measure.
 # We use IdentitiesOnly=yes to prevent "Too many authentication failures" from local keys.
 deploy-bootstrap: _inject
-	ansible-playbook -i $(INVENTORY) $(PLAYBOOK) -u admin --ask-pass --ask-become-pass \
+	$(WITH_VAULT_CLEANUP) ansible-playbook -i $(INVENTORY) $(PLAYBOOK) -u admin --ask-pass --ask-become-pass \
 		-e ssh_enforce_hardening=false \
 		--ssh-common-args='-o IdentitiesOnly=yes' \
 		$(ARGS)
-	@rm -f $(VAULT_YML)
 
 # Dry-run with diff (does not make changes)
 check: _inventory_check _inject
-	ansible-playbook -i $(INVENTORY) $(PLAYBOOK) --check --diff $(ARGS)
-	@rm -f $(VAULT_YML)
+	$(WITH_VAULT_CLEANUP) ansible-playbook -i $(INVENTORY) $(PLAYBOOK) --check --diff $(ARGS)
 
 # Push local inventory to 1Password
 inventory-push:
