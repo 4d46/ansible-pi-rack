@@ -1,13 +1,10 @@
 version: 2
+# Dependabot has no Ansible ecosystem: an unsupported package-ecosystem makes
+# GitHub reject this whole file, so no updates run at all. Container images are
+# handled by Renovate (renovate.json).
 updates:
   # Maintain GitHub Actions (checkout, setup-python, etc.)
   - package-ecosystem: "github-actions"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-
-  # Maintain Ansible Collections (ansible.posix, community.general)
-  - package-ecosystem: "ansible"
     directory: "/"
     schedule:
       interval: "weekly"
