@@ -9,7 +9,7 @@ PLAYBOOK  := site.yml
 # or Ctrl-C) and leaves the playbook's exit code for make to see.
 WITH_VAULT_CLEANUP := trap 'rm -f $(VAULT_YML)' EXIT INT TERM;
 
-.PHONY: deploy deploy-bootstrap check clean lint test deps versions upgrades upgrade-review _inject
+.PHONY: deploy deploy-bootstrap check clean lint test deps lock versions upgrades upgrade-review _inject
 
 # Normal idempotent re-run (admin SSH key must already be deployed)
 deploy: _inject
@@ -89,9 +89,23 @@ upgrade-review:
 	@test -n "$(PR)" || { echo "Usage: make upgrade-review PR=<number>   (find numbers with: make upgrades)"; exit 2; }
 	@scripts/upgrades review $(PR) $(ARGS)
 
+# Python packages first: ansible-galaxy comes from them. --require-hashes makes
+# pip refuse any file whose SHA-256 doesn't match the lock.
 deps:
+	pip install --require-hashes -r requirements.txt
 	ansible-galaxy collection install -r requirements.yml
-	pip install -r requirements.txt
+
+# Regenerate requirements.txt (the hash-pinned lock) from requirements.in,
+# keeping the current versions. To upgrade one package on purpose:
+#   make lock ARGS="--upgrade-package ansible"
+# pip-tools runs in a throwaway environment via uvx, on the .tool-versions
+# Python (UV_PYTHON_DOWNLOADS=never stops uv fetching its own); nothing is installed.
+# click<8.3: pip-tools 7.6.1 with newer click writes a spurious --no-index into
+# the lock's header, and Dependabot re-runs that command when it updates the lock.
+lock:
+	UV_PYTHON_DOWNLOADS=never uvx --python python3 --with 'click<8.3' --from pip-tools pip-compile \
+		--generate-hashes --allow-unsafe --strip-extras --quiet \
+		--output-file=requirements.txt requirements.in $(ARGS)
 
 lint:
 	ansible-lint $(PLAYBOOK)

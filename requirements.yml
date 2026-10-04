@@ -1,4 +1,11 @@
 ---
+# Ansible collections, pinned to exact versions. Galaxy has no hash pinning,
+# so an exact version is the strongest guarantee available; Renovate proposes
+# updates. community.docker provides docker_compose_v2 for the container roles.
 collections:
   - name: ansible.posix
+    version: 2.2.0
+  - name: community.docker
+    version: 5.2.0
   - name: community.general
+    version: 12.6.1
