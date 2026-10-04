@@ -1,0 +1,8 @@
+---
+# Full image reference, shared by the compose template and the pre-upgrade
+# backup check so both always agree on what "the new image" is.
+homeassistant_image: "ghcr.io/home-assistant/home-assistant:{{ ha_image_tag }}"
+
+# Cold copies of config/ taken automatically before an image change.
+homeassistant_backup_dir: "/home/{{ admin_user }}/services/homeassistant/pre-upgrade-backups"
+homeassistant_backup_keep: 5

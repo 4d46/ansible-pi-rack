@@ -77,6 +77,32 @@ Every container image is pinned to an explicit tag in `group_vars/pis/vars.yml` 
 
 Dependabot still handles GitHub Actions, Ansible collections and pip; Renovate only handles container images (`enabledManagers` in `renovate.json`).
 
+#### Home Assistant pre-upgrade backups
+When `make deploy` finds that the running Home Assistant image differs from `ha_image_tag`, it first pulls the new image, then stops HA and archives `config/` to `services/homeassistant/pre-upgrade-backups/pre-upgrade-<old-tag>-<timestamp>.tar.gz`, and only then starts the new version. Unlike HA's own backups, the archive includes the history database (`home-assistant_v2.db`) and the Zigbee database (`zigbee.db`), and it is consistent because HA is stopped while it is taken. HA's `backups/` and `.cache/` are left out. The newest 5 archives are kept (`homeassistant_backup_keep`). They are owned by root with mode `0600` because they contain `secrets.yaml` and HA's auth store. If the backup fails, HA is restarted on the old image and the play stops without upgrading.
+
+To roll back an upgrade that broke something:
+
+1. Revert the Renovate PR on GitHub, then `git pull`.
+2. On the Pi, stop HA and restore the archive taken before the upgrade:
+   ```bash
+   cd ~/services/homeassistant
+   sudo docker compose stop homeassistant
+   sudo mv config config.broken
+   sudo mkdir config
+   sudo tar --extract --gzip --file pre-upgrade-backups/pre-upgrade-<old-tag>-<timestamp>.tar.gz --directory config
+   sudo mv config.broken/backups config/   # keep HA's own backups
+   ```
+3. `make deploy` — this starts HA on the old image. The stopped container still names the newer image, so the deploy also takes one more archive, of the config you just restored. That's harmless.
+4. Once HA is working, delete `config.broken`.
+
+To test the failure path (backup fails → HA restarts on its current image and the play stops), pretend an upgrade is due and point the archive at a directory that doesn't exist:
+
+```bash
+make deploy ARGS="--limit homeassistant_nodes -e ha_image_tag=<newer-tag> -e homeassistant_backup_file=/nonexistent/test.tar.gz"
+```
+
+Both `-e` overrides exist only for that run, and nothing in git changes. `ha_image_tag` triggers the backup, and `-e` takes priority over the block's own `homeassistant_backup_file`, so `tar` fails just after HA is stopped. Expect the play to fail with "Pre-upgrade backup failed…", then check that `make versions` shows HA on its **old** tag with a fresh "Up" time. Use a tag you will upgrade to anyway, because the image is pulled before the backup step and stays on disk. HA is down for about 10–20 seconds.
+
 ### Onboard Radios (Bluetooth / Wi-Fi)
 The rack is wired, so onboard Bluetooth and Wi-Fi are disabled on every Pi by default (`group_vars/pis/vars.yml`):
 

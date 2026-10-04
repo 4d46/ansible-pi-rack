@@ -15,6 +15,100 @@
     group: "{{ admin_user }}"
     mode: '0750'
 
+# Pre-upgrade backup: when the pinned image differs from the one running, take
+# a cold copy of config/ before the compose tasks below swap the container.
+# HA's own backups leave out the history database; this copy includes it and
+# the Zigbee database, and is consistent because HA is stopped while it runs.
+- name: Check which Home Assistant image is running
+  community.docker.docker_container_info:
+    name: homeassistant
+  register: homeassistant_container
+
+- name: Back up Home Assistant config before an image change
+  when:
+    - homeassistant_container.exists
+    - homeassistant_container.container.Config.Image != homeassistant_image
+  vars:
+    homeassistant_backup_file: >-
+      {{ homeassistant_backup_dir }}/pre-upgrade-{{ homeassistant_container.container.Config.Image | regex_replace('^.*:', '') }}-{{
+      ansible_facts['date_time']['iso8601_basic_short'] }}.tar.gz
+  block:
+    # Pull first so HA isn't down for the download, and a bad tag fails here
+    # while the old container is still running.
+    - name: Pull the new Home Assistant image
+      community.docker.docker_image_pull:
+        name: "{{ homeassistant_image }}"
+
+    # Root-only: the archive holds secrets.yaml and .storage/auth (password
+    # hashes and tokens) in a single file that is easy to copy elsewhere.
+    - name: Create pre-upgrade backup directory
+      ansible.builtin.file:
+        path: "{{ homeassistant_backup_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    # A clean stop checkpoints the SQLite WAL files, so the copy is consistent.
+    - name: Stop Home Assistant for a consistent copy
+      community.docker.docker_compose_v2:
+        project_src: "/home/{{ admin_user }}/services/homeassistant"
+        state: stopped
+
+    # backups/ is HA's own backup store (back it up separately) and .cache/ is
+    # disposable; leaving both out keeps each archive small.
+    - name: Archive Home Assistant config
+      ansible.builtin.command:
+        argv:
+          - tar
+          - --create
+          - --gzip
+          - --file
+          - "{{ homeassistant_backup_file }}"
+          - --exclude=./backups
+          - --exclude=./.cache
+          - --directory
+          - "/home/{{ admin_user }}/services/homeassistant/config"
+          - .
+        creates: "{{ homeassistant_backup_file }}"
+
+    - name: Restrict pre-upgrade backup permissions
+      ansible.builtin.file:
+        path: "{{ homeassistant_backup_file }}"
+        owner: root
+        group: root
+        mode: '0600'
+      when: not ansible_check_mode
+
+    - name: Find pre-upgrade backups
+      ansible.builtin.find:
+        paths: "{{ homeassistant_backup_dir }}"
+        patterns: "pre-upgrade-*.tar.gz"
+      register: homeassistant_backups
+
+    - name: Remove all but the newest pre-upgrade backups
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ (homeassistant_backups.files | sort(attribute='mtime', reverse=true))[homeassistant_backup_keep:] }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+
+  # Never upgrade without a backup, and never leave HA down: the compose file
+  # on disk still names the old image at this point, so this restarts it.
+  rescue:
+    - name: Restart Home Assistant on its current image
+      community.docker.docker_compose_v2:
+        project_src: "/home/{{ admin_user }}/services/homeassistant"
+        state: present
+
+    - name: Stop the play rather than upgrade without a backup
+      ansible.builtin.fail:
+        msg: >-
+          Pre-upgrade backup failed, so Home Assistant was restarted on
+          {{ homeassistant_container.container.Config.Image }} and not upgraded. See the
+          failed task above.
+
 - name: Deploy Home Assistant Compose file
   ansible.builtin.template:
     src: docker-compose.yml.j2

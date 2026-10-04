@@ -1,6 +1,6 @@
 services:
   homeassistant:
-    image: ghcr.io/home-assistant/home-assistant:{{ ha_image_tag }}
+    image: {{ homeassistant_image }}
     container_name: homeassistant
     network_mode: host
     volumes:
