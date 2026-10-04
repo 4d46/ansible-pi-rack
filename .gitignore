@@ -1,4 +1,7 @@
 inventory.yml
+# In-progress 'make inventory-pull' downloads, and the old temp-file name.
+inventory.yml.??????
+.inventory.yml.tmp
 group_vars/pis/vault.yml
 .ansible_cache/
 *.retry
