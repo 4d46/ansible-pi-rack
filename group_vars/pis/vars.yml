@@ -44,7 +44,7 @@ certbot_cert_dir: "/etc/letsencrypt/live/{{ tls_hostname_fqdn }}"
 # freezes at whatever was first pulled with no record of which version that is.
 
 # renovate: datasource=docker depName=ghcr.io/home-assistant/home-assistant
-ha_image_tag: "2026.9.2"
+ha_image_tag: "2026.9.4"
 
 # renovate: datasource=docker depName=docker.elastic.co/elasticsearch/elasticsearch
 es_image_tag: "8.13.4"
