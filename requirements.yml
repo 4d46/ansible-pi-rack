@@ -4,7 +4,7 @@
 # updates. community.docker provides docker_compose_v2 for the container roles.
 collections:
   - name: ansible.posix
-    version: 2.2.0
+    version: 2.2.2
   - name: community.docker
     version: 5.2.0
   - name: community.general
