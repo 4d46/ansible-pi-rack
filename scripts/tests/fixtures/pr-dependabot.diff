@@ -1,0 +1,4 @@
+--- a/.github/workflows/lint.yml
++++ b/.github/workflows/lint.yml
+-      - uses: actions/checkout@v4
++      - uses: actions/checkout@v5

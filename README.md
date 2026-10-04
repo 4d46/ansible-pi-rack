@@ -54,6 +54,16 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
   #13  elasticsearch  8.19.22 → 9.5.4  major  checks ✓  mergeable  renovate  opened 2026-10-04
   ```
   This is `scripts/upgrades list`; run `scripts/upgrades help` for all commands. It needs the GitHub CLI (`gh auth login`) and `jq`, and is read-only.
+- `make upgrade-review PR=13`: an AI risk review of one upgrade before you merge it. It prints a risk level, the breaking changes **that affect this rack** (and which don't, and why), what to do before and after deploying, whether rollback is possible, and what it couldn't determine. Each claim is labelled with its source: release notes, live facts, repo, or the model's general knowledge (verify those).
+
+  It combines three inputs:
+  1. **The PR**: the version change and the release notes Renovate includes. These are **untrusted** third-party text.
+  2. **How the image is deployed here**: its pin in `group_vars` and the files of the role that deploys it.
+  3. **Live facts** collected read-only from the Pis by `scripts/collectors/*.sh` (run via Ansible's `script` module): container config (env var *names* only, never values), plus image-specific facts such as Elasticsearch's upgrade-deprecation report and which client versions write to it, or which Home Assistant integrations are in use. Inventory hostnames, FQDNs built on them, IPv4 addresses and `*.ts.net` names are replaced with `<host>`/`<ip>` placeholders before anything is sent.
+
+  `make upgrade-review PR=13 ARGS=--dry-run` prints exactly what would be sent and stops; `ARGS=--no-facts` skips the Pis.
+
+  **How it calls Claude:** through your signed-in Claude Code CLI (`claude -p`), with no API key involved. It runs from an empty temporary directory in `--safe-mode` (no CLAUDE.md, hooks, skills, plugins or MCP servers) with **every tool disabled** (`--tools ""`). The model can only read the payload and answer in the JSON shape defined in `scripts/review/schema.json`. It can't run commands, read files or reach the network, whatever the release notes say. Text in the PR that tries to close its section and pose as facts is defused first. The output only goes to your terminal. The system prompt is in `scripts/review/system-prompt.md`. The model defaults to `claude-opus-5-5` at `high` effort (override with `UPGRADES_REVIEW_MODEL` / `UPGRADES_REVIEW_EFFORT`), and a review takes about a minute.
 
 ### Inventory Management (1Password Sync)
 - `make inventory-pull`: Fetch the `inventory.yml` stored in 1Password.

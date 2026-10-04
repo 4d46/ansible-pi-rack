@@ -1,0 +1,10 @@
+--- container.sh ---
+{
+ "container": "elasticsearch",
+ "image": "docker.elastic.co/elasticsearch/elasticsearch:8.19.22@sha256:e98f9c3b09be",
+ "network_mode": "host"
+}
+--- elasticsearch.sh ---
+Collector failed: Failed to connect to pi-alpha port 22 (pi-alpha.home.example, 10.1.2.3)
+writer seen from PI-ALPHA via pi-alpha.tail1234.ts.net; subnet route 192.168.0.0/24
+unrelated words must survive: alphabet, pi-alphabet, pi-beta-tools, version 8.19.22

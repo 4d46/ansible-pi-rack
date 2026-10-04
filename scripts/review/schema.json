@@ -1,0 +1,28 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["risk", "headline", "relevant_changes", "not_relevant_summary", "before_deploying", "after_deploying", "rollback", "unknowns", "confidence"],
+  "properties": {
+    "risk": {"type": "string", "enum": ["low", "medium", "high"]},
+    "headline": {"type": "string", "description": "One sentence: the main reason for the risk level."},
+    "relevant_changes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["change", "why_it_matters_here", "source"],
+        "properties": {
+          "change": {"type": "string"},
+          "why_it_matters_here": {"type": "string"},
+          "source": {"type": "string", "enum": ["release_notes", "live_facts", "deployment_context", "general_knowledge"]}
+        }
+      }
+    },
+    "not_relevant_summary": {"type": "string", "description": "Brief summary of notable changes that don't affect this setup, and why."},
+    "before_deploying": {"type": "array", "items": {"type": "string"}},
+    "after_deploying": {"type": "array", "items": {"type": "string"}, "description": "Checks that prove the upgrade worked."},
+    "rollback": {"type": "string"},
+    "unknowns": {"type": "array", "items": {"type": "string"}, "description": "What couldn't be determined, and how to find out."},
+    "confidence": {"type": "string", "enum": ["low", "medium", "high"]}
+  }
+}

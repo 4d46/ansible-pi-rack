@@ -32,7 +32,7 @@ jobs:
 
       # shellcheck and jq are preinstalled on GitHub's Ubuntu runners.
       - name: ShellCheck scripts
-        run: shellcheck scripts/upgrades scripts/tests/test_upgrades.sh
+        run: shellcheck scripts/upgrades scripts/tests/test_upgrades.sh scripts/collectors/*.sh
 
       - name: Test scripts
         run: scripts/tests/test_upgrades.sh
