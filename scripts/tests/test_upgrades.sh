@@ -101,9 +101,16 @@ check "review stops release notes closing their section or faking facts" \
 
 check "review parses a Dependabot PR from its title" \
     'package: actions/checkout
-change: 4 → 5
+change: 4 → 5 (major update)
 pull request: #21 "Bump actions/checkout from 4 to 5", opened by dependabot, open' \
     "$(payload pr-dependabot | section upgrade)"
+
+# Without a container pin, the whole changed file is the context: a diff alone
+# hides e.g. a workflow's triggers.
+dependabot_context=$(payload pr-dependabot | section deployment_context)
+check "review shows the whole file a Dependabot PR changes" \
+    "file=yes triggers=yes" \
+    "file=$(grep -q '^=== .github/workflows/lint.yml ===$' <<<"$dependabot_context" && echo yes || echo no) triggers=$(grep -q '^  pull_request:' <<<"$dependabot_context" && echo yes || echo no)"
 
 scripts/upgrades review --dry-run >/dev/null 2>&1
 check "review without a PR number exits 2" "2" "$?"
