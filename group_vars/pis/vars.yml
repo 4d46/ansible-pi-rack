@@ -57,4 +57,4 @@ es_image_tag: "8.19.22@sha256:e98f9c3b09beb2fbb9eaf667d602df3f0e00bd3644138b8458
 grafana_pdc_image_tag: "0.0.66@sha256:768a5dba4d6472a5bcadd009860ac8f723a865e3562e388b402207164962e2ef"
 
 # renovate: datasource=docker depName=tailscale/tailscale
-tailscale_image_tag: "v1.98.4@sha256:25cde9ad76020b0e29229136d0c38b5962e9a0e1774ffac9b0df68e4a37d6cf0"
+tailscale_image_tag: "v1.102.5@sha256:c507f3a2a6ab1cabd8d809b98edeb41edbd5c3fb6ad9632ffd098b4c7d0b4065"
