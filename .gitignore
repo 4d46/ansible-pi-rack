@@ -6,6 +6,7 @@ group_vars/pis/vault.yml
 .ansible_cache/
 *.retry
 .DS_Store
+__pycache__/
 *.md
 !README.md
 # The review tool's system prompt is code, not notes.

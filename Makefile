@@ -20,23 +20,23 @@ INVENTORY_REF := op://System Credentials/PiRack/inventory
 WITH_REMOTE_INVENTORY := remote=$$(mktemp) && trap 'rm -f "$$remote"' EXIT INT TERM && \
 	op read "$(INVENTORY_REF)" > "$$remote" &&
 
-.PHONY: deploy deploy-bootstrap check clean lint test deps lock versions upgrades upgrade-review _inject
+.PHONY: deploy deploy-bootstrap check clean lint test deps deps-check lock versions upgrades upgrade-review _inject
 
 # Normal idempotent re-run (admin SSH key must already be deployed)
-deploy: _inject
+deploy: deps-check _inject
 	$(WITH_VAULT_CLEANUP) ansible-playbook -i $(INVENTORY) $(PLAYBOOK) $(ARGS)
 
 # First-run: Pi Imager creates admin user with password auth
 # We disable SSH hardening here as a safety measure.
 # We use IdentitiesOnly=yes to prevent "Too many authentication failures" from local keys.
-deploy-bootstrap: _inject
+deploy-bootstrap: deps-check _inject
 	$(WITH_VAULT_CLEANUP) ansible-playbook -i $(INVENTORY) $(PLAYBOOK) -u admin --ask-pass --ask-become-pass \
 		-e ssh_enforce_hardening=false \
 		--ssh-common-args='-o IdentitiesOnly=yes' \
 		$(ARGS)
 
 # Dry-run with diff (does not make changes)
-check: _inventory_check _inject
+check: deps-check _inventory_check _inject
 	$(WITH_VAULT_CLEANUP) ansible-playbook -i $(INVENTORY) $(PLAYBOOK) --check --diff $(ARGS)
 
 # Push local inventory to 1Password
@@ -108,6 +108,13 @@ deps:
 	pip install --require-hashes -r requirements.txt
 	ansible-galaxy collection install -r requirements.yml
 
+# Refuse to run the playbook with local tooling that doesn't match the lock:
+# Ansible runs here and ships module code to the Pis, so a stale 'make deps'
+# means running versions CI never tested. Runs before check and deploy.
+# Override (prints a warning): SKIP_DEPS_CHECK=1 make deploy
+deps-check:
+	@python3 -I scripts/check-deps
+
 # Regenerate requirements.txt (the hash-pinned lock) from requirements.in,
 # keeping the current versions. To upgrade one package on purpose:
 #   make lock ARGS="--upgrade-package ansible"
@@ -125,6 +132,7 @@ lint:
 
 test:
 	scripts/tests/test_upgrades.sh
+	python3 -I -m unittest discover -s scripts/tests -p 'test_*.py'
 
 clean:
 	rm -f $(VAULT_YML)
