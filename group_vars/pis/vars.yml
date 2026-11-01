@@ -51,7 +51,7 @@ certbot_cert_dir: "/etc/letsencrypt/live/{{ tls_hostname_fqdn }}"
 ha_image_tag: "2026.10.4@sha256:23f4dfbb69ce76315dbc4de7915504f1c2dcecd7ca2648113a493a385972e133"
 
 # renovate: datasource=docker depName=docker.elastic.co/elasticsearch/elasticsearch
-es_image_tag: "8.19.23@sha256:4d0724bb8d78d7a2330693623e26ca4d621079d062ecc8a30b3e1fc180ec14c1"
+es_image_tag: "9.5.5@sha256:13b4a40bb095774f5fda635e45fd5677cc6a26565e42b24997b0c72b88e75984"
 
 # renovate: datasource=docker depName=grafana/pdc-agent
 grafana_pdc_image_tag: "0.0.67@sha256:e17e65368ca5d8267e8996030869c5cf1b6929e0344e08e90eef6e1179172601"
