@@ -44,6 +44,8 @@ Create an item in 1Password named **`System Credentials/PiRack`** with the follo
 ## Usage
 
 ### Setup and Maintenance
+Run `make` (or `make help`) to list every target with a one-line description, grouped by purpose, plus the options they accept (`ARGS`, `PR`, `SKIP_DEPS_CHECK`). Plain `make` only prints the list; it never deploys.
+
 - `make deps`: Install the Python dependencies (hash-checked) and Ansible collections.
 - `make deps-check`: Confirm the installed Python, packages and collections match the lock. Runs automatically before `make check` and `make deploy`, which stop on a mismatch (see [Local tooling check](#local-tooling-check)).
 - `make lock`: Regenerate `requirements.txt` from `requirements.in` (see [Pinned dependencies](#pinned-dependencies)).
