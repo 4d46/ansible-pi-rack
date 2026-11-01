@@ -6,6 +6,7 @@ Ansible playbook to bootstrap and configure a Raspberry Pi homelab cluster. Desi
 - **Secure by Design**: Secrets and network details are never committed. They are injected at runtime via 1Password CLI (`op`).
 - **OS Hardening**: Disables password authentication, root login, and configures passwordless sudo for the `admin` user. Onboard Bluetooth and Wi-Fi are disabled at boot (see [Onboard Radios](#onboard-radios-bluetooth--wi-fi)).
 - **K3s Ready**: Automatically enables `cpuset` and `memory` cgroups.
+- **Accurate Time**: chrony syncs to a LAN stratum-1 timeserver, cross-checked against NPL and the Debian pool (see [Time Synchronisation](#time-synchronisation)).
 - **Docker Engine**: Installs Docker CE with log rotation configured to prevent SD card wear.
 - **CI Integrated**: GitHub Actions workflow for automated linting.
 
@@ -170,9 +171,34 @@ After re-enabling Bluetooth, re-add the Bluetooth integration in Home Assistant 
 
 > **Safety check:** the playbook refuses to disable Wi-Fi on a host whose default route is over a `wl*` interface, so a Wi-Fi-connected Pi can't be stranded. Set `wifi_enabled: true` for that host, or move it to Ethernet first.
 
+### Time Synchronisation
+The `chrony` role replaces `systemd-timesyncd` (the two packages conflict, so installing chrony removes it). Sources, in order of preference:
+
+1. **LAN timeserver**: stratum 1 from GPS/PPS, marked `prefer` and polled every 16–64 s. Set its hostname in `inventory.yml` (kept out of git):
+   ```yaml
+   pis:
+     vars:
+       chrony_primary_server: timeserver.example.com
+   ```
+   A hostname rather than an IP, so [NTS](https://www.rfc-editor.org/rfc/rfc8915) can be enabled later: NTS checks the server's TLS certificate against its name.
+2. **NPL** (`ntp1`/`ntp2.npl.co.uk`): the UK's national measurement lab, stratum 1.
+3. **Debian pool**: up to two servers, as a last resort.
+
+chrony doesn't treat this as a strict failover list. It compares all sources, discards any that disagree with the majority, and syncs to the best of the rest. `prefer` makes that the LAN server whenever it agrees, so a faulty primary (e.g. GPS jamming) is outvoted rather than followed. Servers offered by DHCP (option 42) are added too, via NetworkManager's dispatcher writing to `/run/chrony-dhcp`.
+
+The Pis don't serve NTP themselves (no `allow` directive), and `chronyc` only listens on localhost. To check:
+
+```bash
+chronyc sources -v    # '*' = selected source, '+' = combined, '-' = not combined, 'x' = falseticker
+chronyc tracking      # current offset, frequency error and root distance
+```
+
+To roll back to timesyncd: revert the change and run `sudo apt install systemd-timesyncd` on each Pi (apt removes chrony as it does so).
+
 ## Repository Structure
 - `group_vars/pis/vault.yml.tpl`: Template for secret injection from 1Password.
 - `roles/common`: OS updates, hardening, cgroups, and user setup.
+- `roles/chrony`: Time synchronisation against the LAN timeserver, with NPL and the Debian pool as backups.
 - `roles/docker`: Docker repository and package installation.
 - `roles/elasticsearch`: Elasticsearch and Grafana PDC Agent deployment.
 - `roles/tailscale`: Tailscale subnet router and exit node configuration.
