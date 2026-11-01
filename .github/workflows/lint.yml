@@ -38,4 +38,10 @@ jobs:
         run: shellcheck scripts/upgrades scripts/tests/test_upgrades.sh scripts/collectors/*.sh
 
       - name: Test scripts
-        run: scripts/tests/test_upgrades.sh
+        run: |
+          scripts/tests/test_upgrades.sh
+          python3 -I -m unittest discover -s scripts/tests -p 'test_*.py'
+
+      # Also proves the check passes on a fresh install from the lock.
+      - name: Check installed tooling matches the lock
+        run: scripts/check-deps
