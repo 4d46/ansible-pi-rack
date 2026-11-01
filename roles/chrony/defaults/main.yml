@@ -1,0 +1,14 @@
+---
+# LAN stratum-1 timeserver, preferred whenever it agrees with the others. Set in
+# inventory.yml (not committed): a hostname rather than an IP so that NTS,
+# which checks the server's certificate against its name, can be enabled later.
+chrony_primary_server: ""
+
+# Public backups. chrony cross-checks every source and drops any that disagree
+# with the majority, so these also catch the primary going wrong. NPL is the
+# UK's national measurement lab (stratum 1); the Debian pool is the last resort.
+chrony_backup_servers:
+  - ntp1.npl.co.uk
+  - ntp2.npl.co.uk
+chrony_backup_pool: 2.debian.pool.ntp.org
+chrony_backup_pool_maxsources: 2

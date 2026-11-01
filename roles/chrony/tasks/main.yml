@@ -1,0 +1,31 @@
+---
+- name: Require a primary time server
+  ansible.builtin.assert:
+    that: chrony_primary_server | length > 0
+    fail_msg: "Set chrony_primary_server in inventory.yml (the LAN timeserver's hostname)."
+    quiet: true
+
+# chrony conflicts with time-daemon, so apt removes systemd-timesyncd here.
+- name: Install chrony
+  ansible.builtin.apt:
+    name: chrony
+    state: present
+  register: chrony_install
+
+- name: Deploy chrony.conf
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/chronyd -p -f %s
+  notify: Restart chrony
+
+# A dry run doesn't really install the package, so there is no unit to check yet.
+- name: Ensure chrony is enabled and running
+  ansible.builtin.systemd:
+    name: chrony
+    enabled: true
+    state: started
+  when: not (ansible_check_mode and chrony_install is changed)

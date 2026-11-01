@@ -143,9 +143,3 @@
     - common_ssh_key_result is succeeded
     - ssh_enforce_hardening | bool
   notify: Restart sshd
-
-- name: Ensure systemd-timesyncd is active
-  ansible.builtin.systemd:
-    name: systemd-timesyncd
-    enabled: true
-    state: started

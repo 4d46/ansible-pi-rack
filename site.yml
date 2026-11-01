@@ -16,6 +16,7 @@
 
   roles:
     - common
+    - chrony
     - docker
     - role: elasticsearch
       when: inventory_hostname in groups['elasticsearch_nodes']
